@@ -11,11 +11,9 @@ const nextConfig = {
     '@stock-screener/ui',
   ],
 
-  // Optimisations production
-  swcMinify: true,
-
   // Exclude Playwright and other server-only packages from client bundle
-  serverComponentsExternalPackages: ['playwright', 'playwright-core'],
+  // Note: serverExternalPackages is the correct option for Next.js 15+
+  serverExternalPackages: ['playwright', 'playwright-core'],
 
   // Webpack configuration to exclude Playwright from bundle
   webpack: (config, { isServer }) => {
