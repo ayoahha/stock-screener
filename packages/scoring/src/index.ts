@@ -61,8 +61,8 @@ export interface ScoringConfig {
 
 // Placeholder exports (seront implémentés en TDD à l'étape 4)
 export function calculateScore(
-  ratios: Record<string, number | undefined>,
-  profile: ScoringProfile
+  _ratios: Record<string, number | undefined>,
+  _profile: ScoringProfile
 ): ScoringResult {
   throw new Error('Not implemented yet - will be implemented in Step 4 (TDD)');
 }

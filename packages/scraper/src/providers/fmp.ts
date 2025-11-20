@@ -9,7 +9,7 @@
 
 import type { StockData } from '../index';
 
-export async function fetchFromFMP(ticker: string): Promise<StockData> {
+export async function fetchFromFMP(_ticker: string): Promise<StockData> {
   // TODO: Implémenter en TDD à l'étape 3
   throw new Error('Not implemented yet');
 }

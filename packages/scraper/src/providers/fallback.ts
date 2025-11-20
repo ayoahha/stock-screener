@@ -12,7 +12,7 @@
 
 import type { StockData } from '../index';
 
-export async function fetchWithFallback(ticker: string): Promise<StockData> {
+export async function fetchWithFallback(_ticker: string): Promise<StockData> {
   // TODO: Implémenter en TDD à l'étape 3
   throw new Error('Not implemented yet');
 }

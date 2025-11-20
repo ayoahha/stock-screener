@@ -15,8 +15,8 @@
 import type { ScoringResult, ScoringProfile } from './index';
 
 export function calculateScoreFromConfig(
-  ratios: Record<string, number | undefined>,
-  profile: ScoringProfile
+  _ratios: Record<string, number | undefined>,
+  _profile: ScoringProfile
 ): ScoringResult {
   // TODO: Implémenter en TDD à l'étape 4
   throw new Error('Not implemented yet');

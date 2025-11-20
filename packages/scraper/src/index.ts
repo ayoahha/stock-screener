@@ -71,10 +71,10 @@ export interface TickerResolution {
 }
 
 // Placeholder exports (seront implémentés en TDD à l'étape 3)
-export async function fetchStockData(ticker: string): Promise<StockData> {
+export async function fetchStockData(_ticker: string): Promise<StockData> {
   throw new Error('Not implemented yet - will be implemented in Step 3 (TDD)');
 }
 
-export async function resolveTicker(query: string): Promise<TickerResolution> {
+export async function resolveTicker(_query: string): Promise<TickerResolution> {
   throw new Error('Not implemented yet - will be implemented in Step 3 (TDD)');
 }

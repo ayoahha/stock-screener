@@ -12,18 +12,18 @@
 import type { StockData } from '../index';
 
 export async function getCachedStockData(
-  ticker: string
+  _ticker: string
 ): Promise<StockData | null> {
   // TODO: Implémenter en TDD à l'étape 3
   throw new Error('Not implemented yet');
 }
 
-export async function setCachedStockData(data: StockData): Promise<void> {
+export async function setCachedStockData(_data: StockData): Promise<void> {
   // TODO: Implémenter en TDD à l'étape 3
   throw new Error('Not implemented yet');
 }
 
-export async function invalidateCache(ticker: string): Promise<void> {
+export async function invalidateCache(_ticker: string): Promise<void> {
   // TODO: Implémenter en TDD à l'étape 3
   throw new Error('Not implemented yet');
 }

@@ -18,7 +18,7 @@
 import type { TickerResolution } from '../index';
 
 export async function resolveTickerFromName(
-  query: string
+  _query: string
 ): Promise<TickerResolution> {
   // TODO: Implémenter en TDD à l'étape 3
   throw new Error('Not implemented yet');
