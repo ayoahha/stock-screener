@@ -1,0 +1,27 @@
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Dependencies
+node_modules/
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Turbo
+.turbo/
+
+# Misc
+.DS_Store
+*.log
+*.tsbuildinfo
