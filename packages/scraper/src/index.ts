@@ -70,11 +70,45 @@ export interface TickerResolution {
   confidence: number; // 0-1
 }
 
-// Placeholder exports (seront implémentés en TDD à l'étape 3)
-export async function fetchStockData(_ticker: string): Promise<StockData> {
-  throw new Error('Not implemented yet - will be implemented in Step 3 (TDD)');
+/**
+ * Main exports - Wired to implementations
+ */
+
+import { fetchWithFallback } from './providers/fallback';
+import { resolveTickerFromName } from './resolver/ticker-resolver';
+import { getCachedStockData, setCachedStockData } from './cache/cache-manager';
+
+/**
+ * Fetch stock data with intelligent fallback
+ * Uses cache if available, then tries: Yahoo → FMP → Error
+ */
+export async function fetchStockData(ticker: string): Promise<StockData> {
+  // Check cache first
+  const cached = await getCachedStockData(ticker);
+  if (cached) {
+    console.log(`[fetchStockData] Cache hit for ${ticker}`);
+    return cached;
+  }
+
+  // Fetch with fallback
+  const startTime = Date.now();
+  const data = await fetchWithFallback(ticker);
+  const duration = Date.now() - startTime;
+
+  // Cache the result
+  try {
+    await setCachedStockData(data, 300, duration); // 5 min TTL
+  } catch (error) {
+    console.warn('Failed to cache data:', error);
+  }
+
+  return data;
 }
 
-export async function resolveTicker(_query: string): Promise<TickerResolution> {
-  throw new Error('Not implemented yet - will be implemented in Step 3 (TDD)');
+/**
+ * Resolve company name to ticker
+ * Examples: "LVMH" → "MC.PA", "Apple" → "AAPL"
+ */
+export async function resolveTicker(query: string): Promise<TickerResolution> {
+  return resolveTickerFromName(query);
 }
