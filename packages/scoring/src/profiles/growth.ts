@@ -8,9 +8,11 @@
  * - ROE : 15%
  */
 
-import type { ScoringConfig } from '../index';
+import type { ScoringProfile } from '../index';
 
-export const GROWTH_PROFILE: ScoringConfig = {
+export const GROWTH_PROFILE: ScoringProfile = {
+  name: 'Growth (Default)',
+  type: 'growth',
   ratios: [
     {
       name: 'RevenueGrowth',
@@ -21,7 +23,6 @@ export const GROWTH_PROFILE: ScoringConfig = {
         fair: 10,
         expensive: 5,
       },
-      inverse: true,
     },
     {
       name: 'EPSGrowth',
@@ -32,7 +33,6 @@ export const GROWTH_PROFILE: ScoringConfig = {
         fair: 8,
         expensive: 3,
       },
-      inverse: true,
     },
     {
       name: 'PEG',
@@ -53,7 +53,6 @@ export const GROWTH_PROFILE: ScoringConfig = {
         fair: 10,
         expensive: 5,
       },
-      inverse: true,
     },
   ],
 };

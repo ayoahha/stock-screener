@@ -8,9 +8,11 @@
  * - PE : 20%
  */
 
-import type { ScoringConfig } from '../index';
+import type { ScoringProfile } from '../index';
 
-export const DIVIDEND_PROFILE: ScoringConfig = {
+export const DIVIDEND_PROFILE: ScoringProfile = {
+  name: 'Dividend (Default)',
+  type: 'dividend',
   ratios: [
     {
       name: 'DividendYield',
@@ -21,7 +23,6 @@ export const DIVIDEND_PROFILE: ScoringConfig = {
         fair: 3,
         expensive: 2,
       },
-      inverse: true,
     },
     {
       name: 'PayoutRatio',

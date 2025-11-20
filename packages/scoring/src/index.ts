@@ -16,6 +16,19 @@ export * from './profiles/value';
 export * from './profiles/growth';
 export * from './profiles/dividend';
 
+import { VALUE_PROFILE } from './profiles/value';
+import { GROWTH_PROFILE } from './profiles/growth';
+import { DIVIDEND_PROFILE } from './profiles/dividend';
+
+/**
+ * Default scoring profiles
+ */
+export const defaultProfiles = {
+  value: VALUE_PROFILE,
+  growth: GROWTH_PROFILE,
+  dividend: DIVIDEND_PROFILE,
+} as const;
+
 // Types principaux
 export type ProfileType = 'value' | 'growth' | 'dividend';
 
@@ -133,7 +146,7 @@ export function calculateScore(
  * Calculate score for a single ratio (0-100)
  */
 function calculateRatioScore(value: number, config: RatioConfig): number {
-  const { thresholds, inverted } = config;
+  const { thresholds } = config;
 
   // Auto-detect if higher is better based on threshold order
   // If excellent > expensive, then higher values are better (e.g., ROE: excellent=0.20, expensive=0.05)

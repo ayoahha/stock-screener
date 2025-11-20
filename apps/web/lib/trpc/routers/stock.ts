@@ -9,7 +9,7 @@
 
 import { z } from 'zod';
 import { router, publicProcedure } from '../server';
-// import { fetchStockData, resolveTicker } from '@stock-screener/scraper';
+import { fetchStockData, resolveTicker } from '@stock-screener/scraper';
 
 export const stockRouter = router({
   /**
@@ -24,23 +24,8 @@ export const stockRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // TODO: Implémenter avec le scraper (étape 3)
-      // return await fetchStockData(input.ticker);
-
-      // Placeholder pour dev
-      return {
-        ticker: input.ticker,
-        name: `Company ${input.ticker}`,
-        price: 100.0,
-        currency: 'EUR',
-        ratios: {
-          PE: 15.0,
-          PB: 2.0,
-          ROE: 18.0,
-        },
-        source: 'placeholder' as const,
-        fetchedAt: new Date(),
-      };
+      // Fetch real stock data using scraper (Yahoo Finance → FMP fallback)
+      return await fetchStockData(input.ticker);
     }),
 
   /**
@@ -55,17 +40,8 @@ export const stockRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // TODO: Implémenter avec le resolver (étape 3)
-      // return await resolveTicker(input.query);
-
-      // Placeholder
-      return {
-        query: input.query,
-        ticker: `${input.query}.PA`,
-        name: `${input.query} SE`,
-        exchange: 'Paris',
-        confidence: 0.9,
-      };
+      // Resolve ticker using the scraper's ticker resolver
+      return await resolveTicker(input.query);
     }),
 
   /**
@@ -80,22 +56,7 @@ export const stockRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // TODO: Implémenter batch fetch (étape 3)
-      // return await Promise.all(input.tickers.map(t => fetchStockData(t)));
-
-      // Placeholder
-      return input.tickers.map((ticker) => ({
-        ticker,
-        name: `Company ${ticker}`,
-        price: Math.random() * 200,
-        currency: 'EUR',
-        ratios: {
-          PE: Math.random() * 30,
-          PB: Math.random() * 5,
-          ROE: Math.random() * 25,
-        },
-        source: 'placeholder' as const,
-        fetchedAt: new Date(),
-      }));
+      // Batch fetch multiple tickers in parallel
+      return await Promise.all(input.tickers.map((t) => fetchStockData(t)));
     }),
 });
