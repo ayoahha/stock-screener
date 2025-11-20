@@ -14,6 +14,29 @@ const nextConfig = {
   // Optimisations production
   swcMinify: true,
 
+  // Exclude Playwright and other server-only packages from client bundle
+  serverComponentsExternalPackages: ['playwright', 'playwright-core'],
+
+  // Webpack configuration to exclude Playwright from bundle
+  webpack: (config, { isServer }) => {
+    // Externalize Playwright for both client and server builds
+    config.externals = config.externals || [];
+    if (Array.isArray(config.externals)) {
+      config.externals.push('playwright', 'playwright-core');
+    }
+
+    // For client builds, alias Playwright to false to prevent bundling attempts
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        playwright: false,
+        'playwright-core': false,
+      };
+    }
+
+    return config;
+  },
+
   // Variables d'environnement exposées côté client
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,

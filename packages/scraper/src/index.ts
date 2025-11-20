@@ -10,7 +10,8 @@
  * - Fallback intelligent avec retry + cache
  */
 
-export * from './providers/yahoo-finance';
+// Note: yahoo-finance is NOT exported here to avoid bundling Playwright in client builds
+// It's only used internally by fallback.ts
 export * from './providers/fmp';
 export * from './providers/fallback';
 export * from './resolver/ticker-resolver';
