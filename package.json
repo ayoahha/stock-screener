@@ -22,12 +22,16 @@
     "clean": "turbo run clean && rm -rf node_modules .turbo",
     "setup": "bash scripts/setup.sh",
     "db:generate-types": "pnpm --filter @stock-screener/database generate-types",
+    "db:test": "tsx scripts/test-supabase.ts",
     "quality:check": "bash scripts/check-quality.sh"
   },
   "devDependencies": {
+    "@supabase/supabase-js": "^2.39.3",
     "@types/node": "^20.11.0",
+    "dotenv": "^16.4.1",
     "prettier": "^3.2.4",
     "prettier-plugin-tailwindcss": "^0.5.11",
+    "tsx": "^4.7.0",
     "turbo": "^1.12.4",
     "typescript": "^5.3.3",
     "vitest": "^1.2.1"
