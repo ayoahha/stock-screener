@@ -1,0 +1,27 @@
+{
+  "name": "@stock-screener/scraper",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo node_modules"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.12",
+    "playwright": "^1.41.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "axios": "^1.6.5",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@stock-screener/typescript-config": "workspace:*",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "stock-screener",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Application d'aide à la décision boursière 100% locale avec scraping robuste des actions européennes",
+  "author": "Stock Screener Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "test:unit": "turbo run test:unit",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "setup": "bash scripts/setup.sh",
+    "db:generate-types": "pnpm --filter @stock-screener/database generate-types",
+    "quality:check": "bash scripts/check-quality.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.4",
+    "prettier-plugin-tailwindcss": "^0.5.11",
+    "turbo": "^1.12.4",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
