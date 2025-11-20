@@ -7,7 +7,7 @@
  * - Invalidation : Automatique via expires_at + manuelle
  */
 
-import { createBrowserClient } from '@stock-screener/database';
+import { createBrowserClient, type Database, type Json } from '@stock-screener/database';
 import type { StockData } from '../index';
 
 const DEFAULT_TTL_SECONDS = 300; // 5 minutes
@@ -38,8 +38,12 @@ export async function getCachedStockData(ticker: string): Promise<StockData | nu
       return null;
     }
 
+    // Type assertion for the row data
+    type CacheRow = Database['public']['Tables']['stock_cache']['Row'];
+    const cacheRow = data as CacheRow;
+
     // Check if cache is expired
-    const expiresAt = new Date(data.expires_at);
+    const expiresAt = new Date(cacheRow.expires_at);
     if (!isCacheValid(expiresAt)) {
       // Cache expired, delete it
       await supabase.from('stock_cache').delete().eq('ticker', ticker);
@@ -47,11 +51,11 @@ export async function getCachedStockData(ticker: string): Promise<StockData | nu
     }
 
     // Parse and return the cached data
-    const cachedData = data.data as unknown as StockData;
+    const cachedData = cacheRow.data as unknown as StockData;
 
     return {
       ...cachedData,
-      fetchedAt: new Date(data.updated_at),
+      fetchedAt: new Date(cacheRow.updated_at),
     };
   } catch (error) {
     console.error('Error getting cached data:', error);
@@ -76,17 +80,18 @@ export async function setCachedStockData(
 
     const cacheEntry = {
       ticker: data.ticker,
-      data: data as unknown,
+      data: data as unknown as Json,
       source: data.source,
       expires_at: expiresAt.toISOString(),
       updated_at: now.toISOString(),
-      fetch_duration_ms: fetchDurationMs,
+      fetch_duration_ms: fetchDurationMs ?? null,
       error_count: errorCount,
     };
 
     // Upsert (insert or update)
-    const { error } = await supabase
-      .from('stock_cache')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase
+      .from('stock_cache') as any)
       .upsert(cacheEntry, {
         onConflict: 'ticker',
       });

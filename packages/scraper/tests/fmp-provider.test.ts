@@ -139,12 +139,11 @@ describe('FMP API Provider - Unit Tests', () => {
     });
 
     it('should parse market cap with multiplier', () => {
-      const marketCapString = '2.8T';
       // Parse logic would convert "2.8T" to 2_800_000_000_000
 
       const parseMarketCap = (text: string): number => {
         const match = text.match(/([0-9.]+)([TBMK])/i);
-        if (match) {
+        if (match && match[1] && match[2]) {
           const value = parseFloat(match[1]);
           const multipliers: Record<string, number> = {
             T: 1_000_000_000_000,
@@ -152,7 +151,10 @@ describe('FMP API Provider - Unit Tests', () => {
             M: 1_000_000,
             K: 1_000,
           };
-          return value * multipliers[match[2].toUpperCase()];
+          const multiplier = multipliers[match[2].toUpperCase()];
+          if (multiplier !== undefined) {
+            return value * multiplier;
+          }
         }
         return parseFloat(text);
       };
@@ -197,15 +199,6 @@ describe('FMP API Provider - Unit Tests', () => {
   describe('Retry Logic', () => {
     it('should retry on network errors', () => {
       let attempts = 0;
-      const maxRetries = 3;
-
-      const mockFetch = async (): Promise<boolean> => {
-        attempts++;
-        if (attempts < maxRetries) {
-          throw new Error('Network error');
-        }
-        return true;
-      };
 
       expect(attempts).toBe(0);
       // In actual implementation, would retry 3 times

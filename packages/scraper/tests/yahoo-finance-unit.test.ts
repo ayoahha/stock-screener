@@ -5,7 +5,7 @@
  * Tests E2E complets nécessitent accès réseau (à faire en intégration)
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { StockData } from '../src/index';
 
 // Mock data basée sur structure réelle Yahoo Finance
@@ -113,10 +113,12 @@ describe('Yahoo Finance Scraper - Unit Tests', () => {
         };
 
         const match = text.match(/([0-9.]+)([TBMK])/i);
-        if (match) {
+        if (match && match[1] && match[2]) {
           const value = parseFloat(match[1]);
           const multiplier = multipliers[match[2].toUpperCase()];
-          return value * multiplier;
+          if (multiplier !== undefined) {
+            return value * multiplier;
+          }
         }
 
         return undefined;

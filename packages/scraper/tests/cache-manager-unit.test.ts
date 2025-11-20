@@ -5,7 +5,7 @@
  * Tests d'intégration complets nécessitent accès réseau
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Helper function to test cache validity logic (extracted for testing)
 function isCacheValid(expiresAt: Date): boolean {

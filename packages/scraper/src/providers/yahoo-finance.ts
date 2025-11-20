@@ -188,6 +188,8 @@ async function extractRatios(page: Page): Promise<FinancialRatios> {
         const labelElement = cells[0];
         const valueElement = cells[1];
 
+        if (!labelElement || !valueElement) continue;
+
         const label = await labelElement.textContent();
         const valueText = await valueElement.textContent();
 
@@ -271,10 +273,12 @@ function parseMarketCap(text: string): number | undefined {
   };
 
   const match = text.match(/([0-9.]+)([TBMK])/i);
-  if (match) {
+  if (match && match[1] && match[2]) {
     const value = parseFloat(match[1]);
     const multiplier = multipliers[match[2].toUpperCase()];
-    return value * multiplier;
+    if (multiplier !== undefined) {
+      return value * multiplier;
+    }
   }
 
   const num = parseFloat(text.replace(/[^0-9.-]/g, ''));
