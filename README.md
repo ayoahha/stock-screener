@@ -256,6 +256,64 @@ Cela crée automatiquement `packages/database/src/types.ts` synchronisé avec vo
 
 ---
 
+## 🤝 **Contributing & Development Workflow**
+
+This project follows a strict Git workflow to maintain code quality and stability.
+
+### Development Workflow
+
+**All development follows this process:**
+
+1. **Create an Issue** - Describe the feature/fix on GitHub
+2. **Create a Branch** from `main` (format: `<type>/<description>-<issue-number>`)
+3. **Make Changes** - Develop and commit regularly
+4. **Run Type Checks** - `pnpm type-check` must pass
+5. **Push to Remote** - Push your feature branch
+6. **Create Pull Request** - Merge into `main` after review
+
+**Never push directly to `main`** - Always use the PR workflow.
+
+### Quick Start
+
+```bash
+# Start new feature
+git checkout main
+git pull origin main
+git checkout -b feature/my-feature-123
+
+# Make changes and commit
+git add .
+git commit -m "feat: My feature description"
+
+# Push and create PR
+git push -u origin feature/my-feature-123
+gh pr create --base main
+
+# After merge, clean up
+git checkout main
+git pull origin main
+git branch -d feature/my-feature-123
+```
+
+### Documentation
+
+Comprehensive workflow documentation is available in the `.claude/` directory:
+
+- **[`.claude/WORKFLOW.md`](.claude/WORKFLOW.md)** - Complete Git workflow guide
+- **[`.claude/CLAUDE.md`](.claude/CLAUDE.md)** - Project structure and conventions
+- **[`.claude/README.md`](.claude/README.md)** - Quick reference
+
+### Pre-Commit Checklist
+
+Before every commit:
+
+- [ ] Run `pnpm type-check` - All TypeScript errors must be fixed
+- [ ] Test changes manually in browser
+- [ ] Follow commit message conventions (conventional commits)
+- [ ] Keep commits focused and atomic
+
+---
+
 ## 🧪 **Tests (TDD Strict)**
 
 ### Tests Unitaires
