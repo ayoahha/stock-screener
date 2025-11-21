@@ -216,72 +216,68 @@ async function extractCompanyName(page: Page, ticker: string): Promise<string> {
 
 async function extractPrice(page: Page): Promise<number> {
   try {
-    // Try multiple selectors for price, in order of specificity
-    const selectors = [
-      'fin-streamer[data-field="regularMarketPrice"][data-test="qsp-price"]',
-      'fin-streamer[data-field="regularMarketPrice"]',
-      '[data-test="qsp-price"]',
-      '.livePrice',
-      'section [class*="price"]'
-    ];
-
-    for (const selector of selectors) {
-      const elements = await page.$$(selector);
-
-      // For fin-streamer elements, prioritize the most visible/primary one
-      // Usually the first one with the most specific selector is the main price
-      for (const element of elements) {
-        if (!element) continue;
-
-        // PRIORITY 1: Try to get value from data attributes (most reliable)
-        const dataValue = await element.getAttribute('data-value');
-        if (dataValue) {
-          const price = parseFloat(dataValue);
-          if (!isNaN(price) && price > 0 && price < 1000000) {
-            console.log(`Extracted price ${price} from data-value attribute using selector: ${selector}`);
-            return price;
-          }
-        }
-
-        // PRIORITY 2: Try the 'value' attribute
-        const valueAttr = await element.getAttribute('value');
-        if (valueAttr) {
-          const price = parseFloat(valueAttr);
-          if (!isNaN(price) && price > 0 && price < 1000000) {
-            console.log(`Extracted price ${price} from value attribute using selector: ${selector}`);
-            return price;
-          }
-        }
-
-        // PRIORITY 3: Try textContent as fallback (less reliable due to formatting)
-        const text = await element.textContent();
-        if (text) {
-          const price = parseFormattedNumber(text);
-          if (price !== undefined && price > 0 && price < 1000000) {
-            // Sanity check: filter out obvious non-price values
-            if (price === 95061.1 || price > 100000) {
-              continue; // Likely not a stock price
-            }
-            console.log(`Extracted price ${price} from textContent using selector: ${selector}`);
-            return price;
-          }
-        }
-      }
-    }
-
-    // Regex fallback on whole page source (last resort, most reliable)
+    // STRATEGY 1 (MOST RELIABLE): Extract from JSON data in page source
+    // Yahoo Finance embeds the actual data in JSON format in the page HTML
+    // This is the most reliable source as it's what Yahoo's own JavaScript uses
     const content = await page.content();
+
     // Look for "regularMarketPrice":{"raw":123.45,"fmt":"123.45"}
     const priceMatch = content.match(/"regularMarketPrice":\s*\{\s*"raw"\s*:\s*([0-9.]+)/);
     if (priceMatch && priceMatch[1]) {
       const price = parseFloat(priceMatch[1]);
-      if (!isNaN(price) && price > 0) {
-        console.log(`Extracted price ${price} using JSON regex fallback`);
+      if (!isNaN(price) && price > 0 && price < 50000) {
+        console.log(`✓ Extracted price ${price} from JSON data (most reliable)`);
         return price;
       }
     }
 
-    throw new Error('Price not found');
+    // STRATEGY 2: Try specific element with data-test attribute (visible price display)
+    // Only use the element with BOTH data-field and data-test attributes (the main price display)
+    const mainPriceElement = await page.$('fin-streamer[data-field="regularMarketPrice"][data-test="qsp-price"]');
+    if (mainPriceElement) {
+      // Try data-value first
+      const dataValue = await mainPriceElement.getAttribute('data-value');
+      if (dataValue) {
+        const price = parseFloat(dataValue);
+        if (!isNaN(price) && price > 0 && price < 50000) {
+          console.log(`✓ Extracted price ${price} from main price element data-value`);
+          return price;
+        }
+      }
+
+      // Try value attribute
+      const valueAttr = await mainPriceElement.getAttribute('value');
+      if (valueAttr) {
+        const price = parseFloat(valueAttr);
+        if (!isNaN(price) && price > 0 && price < 50000) {
+          console.log(`✓ Extracted price ${price} from main price element value`);
+          return price;
+        }
+      }
+
+      // Try text content with smart parsing
+      const text = await mainPriceElement.textContent();
+      if (text) {
+        const price = parseFormattedNumber(text);
+        if (price !== undefined && price > 0 && price < 50000) {
+          console.log(`✓ Extracted price ${price} from main price element text`);
+          return price;
+        }
+      }
+    }
+
+    // STRATEGY 3: Look for alternative JSON patterns
+    // Sometimes the data is in a different format
+    const altPriceMatch = content.match(/"price"\s*:\s*([0-9.]+)/);
+    if (altPriceMatch && altPriceMatch[1]) {
+      const price = parseFloat(altPriceMatch[1]);
+      if (!isNaN(price) && price > 0 && price < 50000) {
+        console.log(`✓ Extracted price ${price} from alternative JSON pattern`);
+        return price;
+      }
+    }
+
+    throw new Error('Price not found - tried JSON extraction and main price element');
   } catch (error) {
     throw new Error(`Failed to extract price: ${(error as Error).message}`);
   }
