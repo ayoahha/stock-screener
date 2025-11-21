@@ -75,6 +75,25 @@ pnpm install --frozen-lockfile=false
 print_success "Dépendances installées"
 
 ###############################################################################
+# 2.5. Installation des navigateurs Playwright
+###############################################################################
+
+print_step "Installation des navigateurs Playwright pour le scraping..."
+
+# Le postinstall script devrait avoir installé Playwright, mais on vérifie
+if command -v playwright &> /dev/null; then
+  if playwright install chromium --with-deps 2>&1 | grep -q "browser"; then
+    print_success "Navigateurs Playwright installés"
+  else
+    print_warning "Installation Playwright échouée (peut nécessiter sudo pour --with-deps)"
+    print_info "Essayez manuellement : pnpm exec playwright install chromium"
+  fi
+else
+  print_warning "Playwright CLI non trouvé"
+  print_info "Essayez : pnpm exec playwright install chromium"
+fi
+
+###############################################################################
 # 3. Configuration .env
 ###############################################################################
 
