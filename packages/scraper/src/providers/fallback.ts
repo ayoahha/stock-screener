@@ -1,23 +1,26 @@
 /**
  * Orchestrateur de fallback intelligent
  *
- * Logique :
- * 1. Tente Yahoo Finance (scraping) - Priorité 1 (plus de données)
- * 2. Si échec → FMP API - Priorité 2 (250 calls/jour gratuits)
- * 3. Si échec → throw error avec détails
+ * Logique (mise à jour 2025) :
+ * 1. Tente Yahoo Finance Query API - Priorité 1 (rapide, fiable, sans scraping)
+ * 2. Si échec → Yahoo Finance Scraping - Priorité 2 (plus de données, plus lent)
+ * 3. Si échec → FMP API - Priorité 3 (fallback final, mais endpoint legacy)
+ * 4. Si échec → throw error avec détails
  *
  * Optimisations :
  * - Timeout adaptatif
  * - Tracking des erreurs
  * - Log des sources utilisées
+ * - Validation des prix
  */
 
 import type { StockData } from '../index';
+import { fetchFromYahooQueryAPI } from './yahoo-query-api';
 import { scrapeYahooFinance } from './yahoo-finance';
 import { fetchFromFMP } from './fmp';
 
 interface FallbackAttempt {
-  source: 'yahoo' | 'fmp' | 'polygon';
+  source: 'yahoo-query' | 'yahoo-scrape' | 'fmp' | 'polygon';
   error?: Error;
   duration?: number;
 }
@@ -30,27 +33,47 @@ export async function fetchWithFallback(ticker: string): Promise<StockData> {
   const attempts: FallbackAttempt[] = [];
   let lastError: Error | null = null;
 
-  // Strategy 1: Yahoo Finance (scraping)
+  // Strategy 1: Yahoo Finance Query API (fast and reliable)
+  // Uses unofficial but stable JSON API endpoint
+  try {
+    console.log(`[Fallback] Attempting Yahoo Query API for ${ticker}...`);
+    const startTime = Date.now();
+
+    const data = await fetchFromYahooQueryAPI(ticker);
+
+    const duration = Date.now() - startTime;
+    attempts.push({ source: 'yahoo-query', duration });
+
+    console.log(`[Fallback] ✓ Yahoo Query API succeeded in ${duration}ms`);
+    return data;
+  } catch (error) {
+    lastError = error as Error;
+    attempts.push({ source: 'yahoo-query', error: lastError });
+    console.log(`[Fallback] ✗ Yahoo Query API failed: ${lastError.message}`);
+  }
+
+  // Strategy 2: Yahoo Finance HTML Scraping (slower but more comprehensive)
   // Most comprehensive data, especially for European stocks
   try {
-    console.log(`[Fallback] Attempting Yahoo Finance for ${ticker}...`);
+    console.log(`[Fallback] Attempting Yahoo Finance HTML scraping for ${ticker}...`);
     const startTime = Date.now();
 
     const data = await scrapeYahooFinance(ticker);
 
     const duration = Date.now() - startTime;
-    attempts.push({ source: 'yahoo', duration });
+    attempts.push({ source: 'yahoo-scrape', duration });
 
-    console.log(`[Fallback] ✓ Yahoo Finance succeeded in ${duration}ms`);
+    console.log(`[Fallback] ✓ Yahoo Finance scraping succeeded in ${duration}ms`);
     return data;
   } catch (error) {
     lastError = error as Error;
-    attempts.push({ source: 'yahoo', error: lastError });
-    console.log(`[Fallback] ✗ Yahoo Finance failed: ${lastError.message}`);
+    attempts.push({ source: 'yahoo-scrape', error: lastError });
+    console.log(`[Fallback] ✗ Yahoo Finance scraping failed: ${lastError.message}`);
   }
 
-  // Strategy 2: FMP API
+  // Strategy 3: FMP API (last resort)
   // Good fallback for US stocks, limited for European
+  // NOTE: Legacy endpoints deprecated as of Aug 2025, may require paid plan
   try {
     console.log(`[Fallback] Attempting FMP API for ${ticker}...`);
     const startTime = Date.now();
@@ -68,8 +91,8 @@ export async function fetchWithFallback(ticker: string): Promise<StockData> {
     console.log(`[Fallback] ✗ FMP API failed: ${lastError.message}`);
   }
 
-  // Strategy 3: Polygon API (optional, not implemented yet)
-  // Could be added later as third fallback
+  // Strategy 4: Additional providers (optional, not implemented yet)
+  // Could add Alpha Vantage, Twelve Data, or other providers as fourth fallback
 
   // All strategies failed
   const errorMessage = buildErrorMessage(ticker, attempts);
