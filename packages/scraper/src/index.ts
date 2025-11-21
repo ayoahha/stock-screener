@@ -24,7 +24,7 @@ export interface StockData {
   price: number;
   currency: string;
   ratios: FinancialRatios;
-  source: 'yahoo' | 'fmp' | 'polygon' | 'scraping';
+  source: 'yahoo' | 'yahoo-query' | 'fmp' | 'polygon' | 'scraping';
   fetchedAt: Date;
 }
 

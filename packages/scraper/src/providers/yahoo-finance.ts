@@ -10,6 +10,7 @@
 
 import { chromium, type Browser, type Page } from 'playwright';
 import type { StockData, FinancialRatios } from '../index';
+import { validatePrice } from './yahoo-query-api';
 
 const MAX_RETRIES = 3;
 const TIMEOUT_MS = 15000;
@@ -68,18 +69,28 @@ export async function scrapeYahooFinance(ticker: string): Promise<StockData> {
         // Ignore consent errors, maybe it wasn't there
       }
 
-      // Give it a moment for hydration/dynamic content, but don't crash if it takes too long
+      // Wait for price element to populate with actual data (not just DOM load)
       try {
+        console.log('Waiting for price data to load...');
+        // Wait for the price element to exist
+        await page.waitForSelector('fin-streamer[data-field="regularMarketPrice"]', { timeout: 10000 }).catch(() => {
+          console.log('Price element detected, waiting for data to load...');
+        });
+
+        // Give extra time for JavaScript to populate the data-value attribute
+        await page.waitForTimeout(2000);
+
+        // Also wait for network to settle
         await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
       } catch {
-        // Ignore timeout
+        // Ignore timeout - we'll try to extract anyway
       }
 
       // Extract basic info with robust fallbacks
       const name = await extractCompanyName(page, ticker);
       let price = 0;
       try {
-        price = await extractPrice(page);
+        price = await extractPrice(page, ticker);
       } catch (e) {
         const title = await page.title();
         console.warn(`Failed to extract price for ${ticker}. Page title: "${title}"`);
@@ -214,7 +225,7 @@ async function extractCompanyName(page: Page, ticker: string): Promise<string> {
   }
 }
 
-async function extractPrice(page: Page): Promise<number> {
+async function extractPrice(page: Page, ticker: string): Promise<number> {
   try {
     // Try multiple selectors for price, in order of specificity
     const selectors = [
@@ -237,7 +248,7 @@ async function extractPrice(page: Page): Promise<number> {
         const dataValue = await element.getAttribute('data-value');
         if (dataValue) {
           const price = parseFloat(dataValue);
-          if (!isNaN(price) && price > 0 && price < 1000000) {
+          if (!isNaN(price) && validatePrice(price, ticker)) {
             console.log(`Extracted price ${price} from data-value attribute using selector: ${selector}`);
             return price;
           }
@@ -247,7 +258,7 @@ async function extractPrice(page: Page): Promise<number> {
         const valueAttr = await element.getAttribute('value');
         if (valueAttr) {
           const price = parseFloat(valueAttr);
-          if (!isNaN(price) && price > 0 && price < 1000000) {
+          if (!isNaN(price) && validatePrice(price, ticker)) {
             console.log(`Extracted price ${price} from value attribute using selector: ${selector}`);
             return price;
           }
@@ -257,11 +268,7 @@ async function extractPrice(page: Page): Promise<number> {
         const text = await element.textContent();
         if (text) {
           const price = parseFormattedNumber(text);
-          if (price !== undefined && price > 0 && price < 1000000) {
-            // Sanity check: filter out obvious non-price values
-            if (price === 95061.1 || price > 100000) {
-              continue; // Likely not a stock price
-            }
+          if (price !== undefined && validatePrice(price, ticker)) {
             console.log(`Extracted price ${price} from textContent using selector: ${selector}`);
             return price;
           }
@@ -269,19 +276,45 @@ async function extractPrice(page: Page): Promise<number> {
       }
     }
 
-    // Regex fallback on whole page source (last resort, most reliable)
+    // Regex fallback on whole page source - extract ALL occurrences
+    console.log('Failed to extract price. Searching for any price-like numbers...');
     const content = await page.content();
-    // Look for "regularMarketPrice":{"raw":123.45,"fmt":"123.45"}
-    const priceMatch = content.match(/"regularMarketPrice":\s*\{\s*"raw"\s*:\s*([0-9.]+)/);
-    if (priceMatch && priceMatch[1]) {
-      const price = parseFloat(priceMatch[1]);
+
+    // Look for ALL "regularMarketPrice":{"raw":123.45,"fmt":"123.45"} occurrences
+    const priceRegex = /"regularMarketPrice":\s*\{\s*"raw"\s*:\s*([0-9.]+)/g;
+    const allMatches: number[] = [];
+    let match;
+
+    while ((match = priceRegex.exec(content)) !== null) {
+      const price = parseFloat(match[1] || '0');
       if (!isNaN(price) && price > 0) {
-        console.log(`Extracted price ${price} using JSON regex fallback`);
-        return price;
+        allMatches.push(price);
+        console.log(`Found regularMarketPrice section: ${match[0] || 'unknown'}`);
       }
     }
 
-    throw new Error('Price not found');
+    // If we found multiple prices, use the most common one or the smallest valid one
+    if (allMatches.length > 0) {
+      // Filter out invalid prices first
+      const validPrices = allMatches.filter(p => validatePrice(p, ticker));
+
+      if (validPrices.length > 0) {
+        // Use the most common price (in case of duplicates) or the smallest
+        // Sort numerically and take the first (smallest)
+        const sortedPrices = validPrices.sort((a, b) => a - b);
+        const price = sortedPrices[0];
+        if (price === undefined) {
+          throw new Error('Failed to extract valid price after sorting');
+        }
+        console.log(`Extracted price ${price} using JSON regex fallback (from ${validPrices.length} valid matches)`);
+        return price;
+      } else {
+        console.warn(`Found ${allMatches.length} prices but none passed validation: ${allMatches.join(', ')}`);
+        throw new Error(`Price validation failed - found suspicious values: ${allMatches.join(', ')}`);
+      }
+    }
+
+    throw new Error('Price not found after waiting for JavaScript - no valid price data in page');
   } catch (error) {
     throw new Error(`Failed to extract price: ${(error as Error).message}`);
   }
