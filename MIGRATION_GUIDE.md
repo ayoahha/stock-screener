@@ -15,14 +15,20 @@ The `stock_history` table and `stock_history_stats` view have not been created i
 
 ## Solution
 
-You need to run the migration SQL in your Supabase Dashboard.
+You need to run TWO migrations in your Supabase Dashboard:
+1. **004_stock_history.sql** - Creates the table and views
+2. **005_fix_security_issues.sql** - Fixes security warnings (REQUIRED)
 
 ### Quick Start
 
-Run this command to see the migration instructions:
+Run these commands to see the migration instructions:
 
 ```bash
+# Step 1: Main migration (creates tables/views)
 node migrate-stock-history.js
+
+# Step 2: Security fix migration (fixes Supabase linter warnings)
+node migrate-security-fix.js
 ```
 
 ### Manual Steps
@@ -61,6 +67,50 @@ node migrate-stock-history.js
 6. **Test the historique page**
 
    Visit `http://localhost:3000/historique` - it should now load without errors!
+
+### Security Fix Migration (REQUIRED)
+
+After running the main migration, you MUST run the security fix migration to address Supabase linter warnings:
+
+1. **Check Supabase Database Advisor**
+
+   Navigate to: Database → Advisors
+
+   You'll see these security warnings:
+   - `security_definer_view` for `stock_history_stats`
+   - `security_definer_view` for `recent_stock_updates`
+   - `rls_disabled_in_public` for `stock_history`
+
+2. **Run the security fix migration**
+
+   ```bash
+   node migrate-security-fix.js
+   ```
+
+3. **Copy and paste the SQL** from `packages/database/src/migrations/005_fix_security_issues.sql`
+
+4. **Execute in SQL Editor**
+
+   - Paste the SQL into a new query
+   - Click "Run"
+
+5. **Verify fixes**
+
+   - Go back to Database → Advisors
+   - All security warnings should be resolved
+   - Green checkmarks for RLS and view security
+
+6. **Restart your app** (if it was running)
+
+   ```bash
+   pnpm start
+   ```
+
+**What this fixes:**
+- ✅ Changes views from `SECURITY DEFINER` to `SECURITY INVOKER` (more secure)
+- ✅ Enables RLS on `stock_history` table
+- ✅ Adds permissive policies for v1 (allows all operations since no auth yet)
+- ✅ Prepares database for future authentication implementation
 
 ## What This Migration Creates
 
@@ -132,18 +182,23 @@ If you see "Environment variables not found" when running the helper script:
 
 ## Files
 
-- **Migration SQL**: `packages/database/src/migrations/004_stock_history.sql`
-- **Helper Script**: `migrate-stock-history.js`
+- **Main Migration SQL**: `packages/database/src/migrations/004_stock_history.sql`
+- **Security Fix SQL**: `packages/database/src/migrations/005_fix_security_issues.sql`
+- **Migration Helper**: `migrate-stock-history.js`
+- **Security Fix Helper**: `migrate-security-fix.js`
+- **Environment Example**: `apps/web/.env.example`
 - **This Guide**: `MIGRATION_GUIDE.md`
 
 ## Next Steps
 
-After the migration is complete:
+After BOTH migrations are complete (004 + 005):
 
 1. ✅ The historique page should load successfully
 2. ✅ Stock searches will auto-save to history
 3. ✅ You can filter, sort, and export stock history
 4. ✅ Statistics will show on the history page
+5. ✅ All Supabase security warnings are resolved
+6. ✅ Database is prepared for future authentication
 
 ## Need Help?
 
