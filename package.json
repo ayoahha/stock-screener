@@ -13,6 +13,7 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
+    "start": "pnpm --filter @stock-screener/web start",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
     "test:unit": "turbo run test:unit",

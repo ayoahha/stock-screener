@@ -47,7 +47,20 @@ export const historyRouter = router({
       })
     )
     .query(async ({ input }) => {
-      const supabase = createServerClient();
+      console.log('[tRPC history.list] Starting query with input:', input);
+
+      let supabase;
+      try {
+        supabase = createServerClient();
+        console.log('[tRPC history.list] Supabase client created successfully');
+      } catch (error) {
+        console.error('[tRPC history.list] Failed to create Supabase client:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create database client',
+          cause: error,
+        });
+      }
 
       let query = supabase.from('stock_history').select('*', { count: 'exact' });
 
@@ -92,12 +105,21 @@ export const historyRouter = router({
       const { data, error, count } = await query;
 
       if (error) {
+        console.error('[tRPC history.list] Database query failed:', {
+          error,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to fetch stock history',
+          message: `Failed to fetch stock history: ${error.message}`,
           cause: error,
         });
       }
+
+      console.log(`[tRPC history.list] Query successful, found ${count} items`);
 
       return {
         items: data || [],
@@ -304,7 +326,20 @@ export const historyRouter = router({
    * Get global statistics about the history
    */
   stats: publicProcedure.query(async () => {
-    const supabase = createServerClient();
+    console.log('[tRPC history.stats] Starting stats query');
+
+    let supabase;
+    try {
+      supabase = createServerClient();
+      console.log('[tRPC history.stats] Supabase client created successfully');
+    } catch (error) {
+      console.error('[tRPC history.stats] Failed to create Supabase client:', error);
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to create database client',
+        cause: error,
+      });
+    }
 
     const { data, error } = await supabase
       .from('stock_history_stats')
@@ -313,8 +348,15 @@ export const historyRouter = router({
 
     // Handle case where database is empty (view returns no rows or PGRST116 error)
     if (error) {
+      console.log('[tRPC history.stats] Query error:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
+
       if (error.code === 'PGRST116') {
         // No rows found - return default empty stats
+        console.log('[tRPC history.stats] No data found, returning empty stats');
         return {
           total_stocks: 0,
           value_stocks: 0,
@@ -324,13 +366,15 @@ export const historyRouter = router({
           last_update: null,
         };
       }
+      console.error('[tRPC history.stats] Failed to fetch stats:', error);
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to fetch history statistics',
+        message: `Failed to fetch history statistics: ${error.message}`,
         cause: error,
       });
     }
 
+    console.log('[tRPC history.stats] Stats retrieved successfully:', data);
     return data;
   }),
 });
