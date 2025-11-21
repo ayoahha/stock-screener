@@ -1,0 +1,45 @@
+-- Migration: Fix Function Search Path
+-- Version: 1.1.2
+-- Description: Fixes search_path warning for increment_fetch_count function
+
+-- ============================================================================
+-- Fix: Recreate increment_fetch_count function with explicit search_path
+-- ============================================================================
+
+-- Step 1: Drop the trigger that depends on the function
+DROP TRIGGER IF EXISTS stock_history_increment_fetch ON stock_history;
+
+-- Step 2: Drop the existing function
+DROP FUNCTION IF EXISTS increment_fetch_count();
+
+-- Step 3: Recreate function with explicit search_path set to 'public'
+CREATE OR REPLACE FUNCTION increment_fetch_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Si c'est une mise à jour (pas une insertion)
+  IF TG_OP = 'UPDATE' THEN
+    NEW.fetch_count = OLD.fetch_count + 1;
+    NEW.last_fetched_at = NOW();
+    -- Conserver first_added_at de l'ancien enregistrement
+    NEW.first_added_at = OLD.first_added_at;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Step 4: Recreate the trigger
+CREATE TRIGGER stock_history_increment_fetch
+  BEFORE UPDATE ON stock_history
+  FOR EACH ROW
+  EXECUTE FUNCTION increment_fetch_count();
+
+-- ============================================================================
+-- Comments for documentation
+-- ============================================================================
+
+COMMENT ON FUNCTION increment_fetch_count() IS 'Auto-increment fetch_count and update last_fetched_at on stock_history updates - search_path secured';
+COMMENT ON TRIGGER stock_history_increment_fetch ON stock_history IS 'Auto-increment fetch_count on updates';
