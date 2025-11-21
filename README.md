@@ -168,6 +168,7 @@ This project was built following strict **Test-Driven Development** methodology 
 - **Node.js 20+** ([Télécharger](https://nodejs.org/))
 - **pnpm 8+** (installé automatiquement par le script si absent)
 - **Compte Supabase** gratuit ([S'inscrire](https://supabase.com/))
+- **Playwright browsers** (installés automatiquement lors de `pnpm install`)
 
 ### Setup en 3 Commandes
 
@@ -556,6 +557,24 @@ If issue persists, manually fix types in `packages/database/src/types.ts`
 **Production**: Re-enable Google Fonts by uncommenting imports in `app/layout.tsx`.
 
 ### Common Build Errors
+
+#### Playwright Browsers Not Installed
+
+**Symptom**: Stock data fetching fails with error:
+```
+browserType.launch: Executable doesn't exist at /home/user/.cache/ms-playwright/...
+```
+
+**Cause**: Playwright browser binaries were not downloaded automatically during installation.
+
+**Solution**: Run the following command to install Playwright browsers:
+```bash
+pnpm exec playwright install chromium
+# or if you need system dependencies (Linux)
+pnpm exec playwright install chromium --with-deps
+```
+
+**Note**: Since v1.1, Playwright browsers are automatically installed via postinstall script. If you still encounter this issue, run the command above manually.
 
 #### Playwright Bundling Error
 

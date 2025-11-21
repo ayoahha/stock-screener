@@ -31,6 +31,16 @@ export async function scrapeYahooFinance(ticker: string): Promise<StockData> {
           '--disable-dev-shm-usage',
           '--no-sandbox',
         ],
+      }).catch((error: Error) => {
+        // Check if it's a missing Playwright browsers error
+        if (error.message.includes("Executable doesn't exist") || error.message.includes('browserType.launch')) {
+          throw new Error(
+            'Playwright browsers not installed. Please run: pnpm exec playwright install chromium\n' +
+            'This is required for scraping Yahoo Finance data. The installation should have been automatic.\n' +
+            'Original error: ' + error.message
+          );
+        }
+        throw error;
       });
 
       const context = await browser.newContext({
