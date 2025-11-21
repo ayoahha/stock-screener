@@ -9,7 +9,7 @@
     "node": ">=20.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@10.23.0",
   "scripts": {
     "postinstall": "playwright install chromium --with-deps || echo 'Warning: Playwright browser installation failed. Run: pnpm playwright:install'",
     "playwright:install": "playwright install chromium --with-deps",
@@ -29,15 +29,15 @@
     "quality:check": "bash scripts/check-quality.sh"
   },
   "devDependencies": {
-    "@supabase/supabase-js": "^2.39.3",
-    "@types/node": "^20.11.0",
-    "dotenv": "^16.4.1",
-    "prettier": "^3.2.4",
-    "prettier-plugin-tailwindcss": "^0.5.11",
-    "tsx": "^4.7.0",
-    "turbo": "^1.12.4",
-    "typescript": "^5.3.3",
-    "vitest": "^1.2.1"
+    "@supabase/supabase-js": "^2.84.0",
+    "@types/node": "^20.19.25",
+    "dotenv": "^16.6.1",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.5.14",
+    "tsx": "^4.20.6",
+    "turbo": "^1.13.4",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
   },
   "workspaces": [
     "apps/*",
