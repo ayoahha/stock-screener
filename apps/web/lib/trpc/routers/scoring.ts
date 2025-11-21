@@ -9,7 +9,11 @@
 
 import { z } from 'zod';
 import { router, publicProcedure } from '../server';
-// import { calculateScore } from '@stock-screener/scoring';
+import {
+  calculateScore,
+  defaultProfiles,
+  type RatioConfig,
+} from '@stock-screener/scoring';
 
 export const scoringRouter = router({
   /**
@@ -21,28 +25,18 @@ export const scoringRouter = router({
     .input(
       z.object({
         ratios: z.record(z.number().optional()),
-        profile: z.enum(['value', 'growth', 'dividend']),
+        profileType: z.enum(['value', 'growth', 'dividend']).default('value'),
       })
     )
     .query(async ({ input }) => {
-      // TODO: Implémenter avec scoring engine (étape 4)
-      // return calculateScore(input.ratios, input.profile);
+      // Get the selected profile from defaults
+      const profile = defaultProfiles[input.profileType];
 
-      // Placeholder
-      const score = Math.random() * 100;
-      let verdict: string;
-      if (score >= 90) verdict = 'EXCEPTIONAL_OPPORTUNITY';
-      else if (score >= 75) verdict = 'EXCELLENT_DEAL';
-      else if (score >= 60) verdict = 'GOOD_DEAL';
-      else if (score >= 40) verdict = 'FAIR';
-      else if (score >= 20) verdict = 'EXPENSIVE';
-      else verdict = 'TOO_EXPENSIVE';
+      // Calculate score using the real scoring engine
+      const result = calculateScore(input.ratios, profile);
 
       return {
-        score: Math.round(score),
-        verdict,
-        breakdown: [],
-        profile: input.profile,
+        ...result,
         timestamp: new Date(),
       };
     }),
@@ -51,25 +45,25 @@ export const scoringRouter = router({
    * Get all scoring profiles
    */
   getProfiles: publicProcedure.query(async () => {
-    // TODO: Fetch depuis Supabase custom_scoring_profiles
+    // Return the default profiles from the scoring engine
     return [
       {
-        id: '1',
-        name: 'Value (Default)',
-        description: 'Profil Value classique',
-        baseProfile: 'value',
+        id: 'value',
+        name: defaultProfiles.value.name,
+        description: 'Profil Value classique - Focus P/E, P/B, dette',
+        type: defaultProfiles.value.type,
       },
       {
-        id: '2',
-        name: 'Growth (Default)',
-        description: 'Profil Growth',
-        baseProfile: 'growth',
+        id: 'growth',
+        name: defaultProfiles.growth.name,
+        description: 'Profil Growth - Focus croissance CA/EPS, marges',
+        type: defaultProfiles.growth.type,
       },
       {
-        id: '3',
-        name: 'Dividend (Default)',
-        description: 'Profil Dividend',
-        baseProfile: 'dividend',
+        id: 'dividend',
+        name: defaultProfiles.dividend.name,
+        description: 'Profil Dividend - Focus rendement et payout ratio',
+        type: defaultProfiles.dividend.type,
       },
     ];
   }),
@@ -80,19 +74,22 @@ export const scoringRouter = router({
   getProfile: publicProcedure
     .input(
       z.object({
-        id: z.string(),
+        id: z.enum(['value', 'growth', 'dividend']),
       })
     )
     .query(async ({ input }) => {
-      // TODO: Fetch depuis Supabase
+      // Return the full profile configuration
+      const profile = defaultProfiles[input.id];
+
       return {
         id: input.id,
-        name: 'Value (Default)',
-        description: 'Profil Value classique',
-        baseProfile: 'value',
-        config: {
-          ratios: [],
-        },
+        name: profile.name,
+        type: profile.type,
+        ratios: profile.ratios.map((r: RatioConfig) => ({
+          name: r.name,
+          weight: r.weight,
+          thresholds: r.thresholds,
+        })),
       };
     }),
 });

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+import type { Database } from './types-manual';
 
 /**
  * Crée un client Supabase côté serveur avec la service role key (accès admin)
@@ -50,7 +50,15 @@ export function createBrowserClient() {
 }
 
 /**
- * Client Supabase par défaut (utilise anon key)
+ * Client Supabase singleton (lazy-initialized)
  * Utilisé pour les opérations publiques sans auth
+ * ⚠️ Initialisé uniquement au runtime, pas au build time
  */
-export const supabase = createBrowserClient();
+let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null;
+
+export function getSupabaseClient() {
+  if (!supabaseInstance) {
+    supabaseInstance = createBrowserClient();
+  }
+  return supabaseInstance;
+}

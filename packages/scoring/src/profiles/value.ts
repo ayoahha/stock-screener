@@ -9,9 +9,11 @@
  * - ROE : 15%
  */
 
-import type { ScoringConfig } from '../index';
+import type { ScoringProfile } from '../index';
 
-export const VALUE_PROFILE: ScoringConfig = {
+export const VALUE_PROFILE: ScoringProfile = {
+  name: 'Value (Default)',
+  type: 'value',
   ratios: [
     {
       name: 'PE',
@@ -42,7 +44,6 @@ export const VALUE_PROFILE: ScoringConfig = {
         fair: 2,
         expensive: 1,
       },
-      inverse: true, // Plus haut = mieux
     },
     {
       name: 'DebtToEquity',
@@ -63,7 +64,6 @@ export const VALUE_PROFILE: ScoringConfig = {
         fair: 5,
         expensive: 0,
       },
-      inverse: true,
     },
   ],
 };

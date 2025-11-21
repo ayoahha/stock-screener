@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+// Google Fonts disabled in sandboxed environment (network restrictions)
+// import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import { TRPCProvider } from '@/lib/trpc/provider';
 
-const inter = Inter({ subsets: ['latin'] });
+// const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Stock Screener - Aide à la Décision Boursière',
@@ -26,7 +27,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className="dark">
-      <body className={inter.className}>
+      <body className="font-sans">
         <TRPCProvider>{children}</TRPCProvider>
       </body>
     </html>

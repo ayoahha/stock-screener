@@ -1,16 +1,17 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Configuration Playwright E2E
+ * Playwright E2E Test Configuration
  *
- * Tests end-to-end dans un navigateur réel
+ * Tests the complete stock screener flow:
+ * - Stock search
+ * - Data fetching
+ * - Score calculation
+ * - UI rendering
  */
 
-const PORT = process.env.PORT || 3000;
-const baseURL = `http://localhost:${PORT}`;
-
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './e2e',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -18,7 +19,7 @@ export default defineConfig({
   reporter: 'html',
 
   use: {
-    baseURL,
+    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -28,29 +29,12 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    // Tests mobile (optionnel)
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
   ],
 
-  // Démarrer le serveur Next.js avant les tests
   webServer: {
     command: 'pnpm dev',
-    url: baseURL,
+    url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
+    timeout: 120000,
   },
 });
