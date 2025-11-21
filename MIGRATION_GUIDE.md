@@ -15,9 +15,10 @@ The `stock_history` table and `stock_history_stats` view have not been created i
 
 ## Solution
 
-You need to run TWO migrations in your Supabase Dashboard:
+You need to run THREE migrations in your Supabase Dashboard:
 1. **004_stock_history.sql** - Creates the table and views
-2. **005_fix_security_issues.sql** - Fixes security warnings (REQUIRED)
+2. **005_fix_security_issues.sql** - Fixes RLS and view security warnings (REQUIRED)
+3. **006_fix_function_search_path.sql** - Fixes function search_path warning (REQUIRED)
 
 ### Quick Start
 
@@ -27,8 +28,11 @@ Run these commands to see the migration instructions:
 # Step 1: Main migration (creates tables/views)
 node migrate-stock-history.js
 
-# Step 2: Security fix migration (fixes Supabase linter warnings)
+# Step 2: RLS and view security fix
 node migrate-security-fix.js
+
+# Step 3: Function search_path fix (see SQL below)
+cat packages/database/src/migrations/006_fix_function_search_path.sql
 ```
 
 ### Manual Steps
@@ -112,6 +116,47 @@ After running the main migration, you MUST run the security fix migration to add
 - ✅ Adds permissive policies for v1 (allows all operations since no auth yet)
 - ✅ Prepares database for future authentication implementation
 
+### Function Search Path Fix (Migration 006)
+
+After running migrations 004 and 005, you'll see one remaining warning about the `increment_fetch_count` function. Here's how to fix it:
+
+1. **Copy the SQL** from `packages/database/src/migrations/006_fix_function_search_path.sql`
+
+   Or run: `cat packages/database/src/migrations/006_fix_function_search_path.sql`
+
+2. **Paste and execute** in Supabase SQL Editor
+
+3. **Verify the fix**:
+   - Go to Database → Advisors
+   - The `function_search_path_mutable` warning should be gone
+   - All security checks should now pass ✅
+
+**What this fixes:**
+- ✅ Sets explicit `search_path = public` on `increment_fetch_count` function
+- ✅ Prevents potential SQL injection via search_path manipulation
+- ✅ Ensures function always operates in expected schema context
+
+**The SQL (short and simple):**
+```sql
+DROP FUNCTION IF EXISTS increment_fetch_count();
+
+CREATE OR REPLACE FUNCTION increment_fetch_count()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    NEW.fetch_count = OLD.fetch_count + 1;
+    NEW.last_fetched_at = NOW();
+    NEW.first_added_at = OLD.first_added_at;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+```
+
 ## What This Migration Creates
 
 ### `stock_history` Table
@@ -154,6 +199,8 @@ Run migrations in order:
 2. `002_security_fixes.sql` (if exists)
 3. `003_fix_search_path.sql` (if exists)
 4. `004_stock_history.sql`
+5. `005_fix_security_issues.sql`
+6. `006_fix_function_search_path.sql`
 
 ### Still getting errors after migration
 
@@ -183,15 +230,17 @@ If you see "Environment variables not found" when running the helper script:
 ## Files
 
 - **Main Migration SQL**: `packages/database/src/migrations/004_stock_history.sql`
-- **Security Fix SQL**: `packages/database/src/migrations/005_fix_security_issues.sql`
+- **Security Fix SQL (RLS/Views)**: `packages/database/src/migrations/005_fix_security_issues.sql`
+- **Security Fix SQL (Function)**: `packages/database/src/migrations/006_fix_function_search_path.sql`
 - **Migration Helper**: `migrate-stock-history.js`
 - **Security Fix Helper**: `migrate-security-fix.js`
 - **Environment Example**: `apps/web/.env.example`
+- **Migrations README**: `packages/database/src/migrations/README.md`
 - **This Guide**: `MIGRATION_GUIDE.md`
 
 ## Next Steps
 
-After BOTH migrations are complete (004 + 005):
+After ALL THREE migrations are complete (004 + 005 + 006):
 
 1. ✅ The historique page should load successfully
 2. ✅ Stock searches will auto-save to history

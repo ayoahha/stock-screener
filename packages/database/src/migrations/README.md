@@ -10,22 +10,28 @@ Migrations should be run in numerical order:
 2. ✅ **002_security_fixes.sql** - Security improvements for initial schema
 3. ✅ **003_fix_search_path.sql** - Fixes PostgreSQL search path issues
 4. ⚠️ **004_stock_history.sql** - Creates stock_history table and views (SEE BELOW)
-5. 🔒 **005_fix_security_issues.sql** - Fixes security warnings from Supabase linter (REQUIRED after 004)
+5. 🔒 **005_fix_security_issues.sql** - Fixes RLS and view security warnings (REQUIRED after 004)
+6. 🔒 **006_fix_function_search_path.sql** - Fixes function search_path warning (REQUIRED after 004)
 
-## Important: Migration 004 + 005
+## Important: Migration 004 + 005 + 006
 
-If you've run migration **004_stock_history.sql**, you **MUST** also run **005_fix_security_issues.sql** to address Supabase security warnings.
+If you've run migration **004_stock_history.sql**, you **MUST** also run **005_fix_security_issues.sql** and **006_fix_function_search_path.sql** to address all Supabase security warnings.
 
 ### Why?
 
 Migration 004 creates the stock_history infrastructure but has these security issues:
 - Views use `SECURITY DEFINER` (dangerous)
 - RLS is disabled on `stock_history` table (flagged as security risk)
+- Function `increment_fetch_count` has mutable search_path (potential security issue)
 
-Migration 005 fixes these issues:
+Migration 005 fixes view and RLS issues:
 - Changes views to `SECURITY INVOKER` (more secure)
 - Enables RLS on `stock_history` table
 - Adds permissive policies for v1 (no auth yet)
+
+Migration 006 fixes function security:
+- Sets explicit `search_path = public` on `increment_fetch_count` function
+- Prevents potential SQL injection via search_path manipulation
 
 ### Quick Start
 
@@ -33,8 +39,11 @@ Migration 005 fixes these issues:
 # Display migration 004 SQL
 node migrate-stock-history.js
 
-# Display migration 005 SQL (security fix)
+# Display migration 005 SQL (RLS and view security)
 node migrate-security-fix.js
+
+# Migration 006 SQL is short, copy from file directly
+cat packages/database/src/migrations/006_fix_function_search_path.sql
 ```
 
 ## Running Migrations
@@ -99,6 +108,15 @@ Fixes:
 
 These permissive policies are safe for v1 (no authentication) and can be replaced with proper policies when auth is implemented.
 
+### 006_fix_function_search_path.sql
+
+Fixes:
+- Recreates `increment_fetch_count()` function with explicit `search_path = public`
+- Adds `SECURITY DEFINER` with secure search_path setting
+- Prevents potential security issues from search_path manipulation
+
+This is a small but important security fix that ensures the function always operates in the expected schema context.
+
 ## Troubleshooting
 
 ### "Function does not exist"
@@ -107,7 +125,7 @@ Make sure you've run migration 001 first, which creates the `update_updated_at_c
 
 ### Security warnings still present
 
-1. Make sure you ran migration 005
+1. Make sure you ran migrations 005 AND 006
 2. Refresh the Database Advisors page
 3. Check that RLS is enabled on `stock_history`
 4. Verify views are using SECURITY INVOKER:
@@ -116,6 +134,13 @@ Make sure you've run migration 001 first, which creates the `update_updated_at_c
    FROM pg_views
    WHERE schemaname = 'public'
    AND viewname IN ('stock_history_stats', 'recent_stock_updates');
+   ```
+5. Verify function has search_path set:
+   ```sql
+   SELECT p.proname, p.prosecdef, pg_get_function_identity_arguments(p.oid)
+   FROM pg_proc p
+   JOIN pg_namespace n ON p.pronamespace = n.oid
+   WHERE n.nspname = 'public' AND p.proname = 'increment_fetch_count';
    ```
 
 ### App still fails to connect
