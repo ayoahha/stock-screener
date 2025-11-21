@@ -15,6 +15,7 @@ export * from './engine';
 export * from './profiles/value';
 export * from './profiles/growth';
 export * from './profiles/dividend';
+export * from './classification';
 
 import { VALUE_PROFILE } from './profiles/value';
 import { GROWTH_PROFILE } from './profiles/growth';

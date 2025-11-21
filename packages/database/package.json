@@ -6,6 +6,7 @@
   "types": "./src/index.ts",
   "scripts": {
     "generate-types": "tsx scripts/generate-types.ts",
+    "migrate": "tsx scripts/run-migration.ts",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist .turbo node_modules"
   },

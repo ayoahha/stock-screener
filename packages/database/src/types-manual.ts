@@ -1,7 +1,9 @@
 /**
  * Types Supabase générés manuellement depuis le schéma SQL
  *
- * Ces types sont basés sur packages/database/src/migrations/001_initial_schema.sql
+ * Ces types sont basés sur packages/database/src/migrations/
+ * - 001_initial_schema.sql
+ * - 004_stock_history.sql
  * Pour les régénérer automatiquement : pnpm db:generate-types (nécessite npx supabase login)
  */
 
@@ -135,6 +137,59 @@ export interface Database {
           error_count?: number;
         };
       };
+      stock_history: {
+        Row: {
+          id: string;
+          created_at: string;
+          updated_at: string;
+          ticker: string;
+          name: string;
+          price: number | null;
+          currency: string | null;
+          source: 'yahoo' | 'fmp' | 'polygon' | 'scraping';
+          ratios: Json;
+          score: number | null;
+          verdict: string | null;
+          stock_type: 'value' | 'growth' | 'dividend';
+          last_fetched_at: string;
+          first_added_at: string;
+          fetch_count: number;
+        };
+        Insert: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          ticker: string;
+          name: string;
+          price?: number | null;
+          currency?: string | null;
+          source: 'yahoo' | 'fmp' | 'polygon' | 'scraping';
+          ratios?: Json;
+          score?: number | null;
+          verdict?: string | null;
+          stock_type?: 'value' | 'growth' | 'dividend';
+          last_fetched_at?: string;
+          first_added_at?: string;
+          fetch_count?: number;
+        };
+        Update: {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+          ticker?: string;
+          name?: string;
+          price?: number | null;
+          currency?: string | null;
+          source?: 'yahoo' | 'fmp' | 'polygon' | 'scraping';
+          ratios?: Json;
+          score?: number | null;
+          verdict?: string | null;
+          stock_type?: 'value' | 'growth' | 'dividend';
+          last_fetched_at?: string;
+          first_added_at?: string;
+          fetch_count?: number;
+        };
+      };
     };
     Views: {
       valid_stock_cache: {
@@ -147,6 +202,29 @@ export interface Database {
           source: 'yahoo' | 'fmp' | 'polygon' | 'scraping';
           fetch_duration_ms: number | null;
           error_count: number;
+        };
+      };
+      stock_history_stats: {
+        Row: {
+          total_stocks: number | null;
+          value_stocks: number | null;
+          growth_stocks: number | null;
+          dividend_stocks: number | null;
+          average_score: number | null;
+          last_update: string | null;
+        };
+      };
+      recent_stock_updates: {
+        Row: {
+          ticker: string;
+          name: string;
+          price: number | null;
+          currency: string | null;
+          score: number | null;
+          verdict: string | null;
+          stock_type: 'value' | 'growth' | 'dividend';
+          last_fetched_at: string;
+          fetch_count: number;
         };
       };
     };

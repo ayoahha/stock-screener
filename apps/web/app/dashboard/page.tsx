@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { StockSearch } from '@/components/stock-search';
 import { ScoreGauge } from '@/components/score-gauge';
 import { RatioBreakdown } from '@/components/ratio-breakdown';
+import { TabNavigation } from '@/components/tab-navigation';
 import { Card } from '@/components/ui/card';
 import { trpc } from '@/lib/trpc/client';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Search, History } from 'lucide-react';
 
 export default function DashboardPage() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -43,7 +44,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       {/* Header */}
-      <header className="mb-8">
+      <header className="mb-6">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">
           Stock Screener
         </h1>
@@ -51,6 +52,14 @@ export default function DashboardPage() {
           Analyse de valeur pour actions européennes • Focus France & Allemagne
         </p>
       </header>
+
+      {/* Tab Navigation */}
+      <TabNavigation
+        tabs={[
+          { label: 'Recherche', href: '/dashboard', icon: <Search className="h-5 w-5" /> },
+          { label: 'Historique', href: '/historique', icon: <History className="h-5 w-5" /> },
+        ]}
+      />
 
       {/* Search Section */}
       <div className="mb-8">
@@ -85,6 +94,34 @@ export default function DashboardPage() {
               <p className="text-lg text-gray-600">
                 Chargement des données pour {selectedTicker}...
               </p>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Stock Info Card */}
+      {stockData && (
+        <div className="mb-8">
+          <Card className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div>
+                <p className="text-sm text-gray-500">Ticker</p>
+                <p className="text-xl font-semibold">{stockData.ticker}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Nom</p>
+                <p className="text-xl font-semibold">{stockData.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Prix</p>
+                <p className="text-xl font-semibold">
+                  {stockData.price.toFixed(2)} {stockData.currency}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Source</p>
+                <p className="text-xl font-semibold uppercase">{stockData.source}</p>
+              </div>
             </div>
           </Card>
         </div>
@@ -126,34 +163,6 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
-
-      {/* Stock Info Card */}
-      {stockData && (
-        <div className="mt-8">
-          <Card className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div>
-                <p className="text-sm text-gray-500">Ticker</p>
-                <p className="text-xl font-semibold">{stockData.ticker}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Nom</p>
-                <p className="text-xl font-semibold">{stockData.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Prix</p>
-                <p className="text-xl font-semibold">
-                  {stockData.price.toFixed(2)} {stockData.currency}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Source</p>
-                <p className="text-xl font-semibold uppercase">{stockData.source}</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
