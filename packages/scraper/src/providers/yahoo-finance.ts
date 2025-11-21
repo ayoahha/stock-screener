@@ -216,7 +216,7 @@ async function extractCompanyName(page: Page, ticker: string): Promise<string> {
 
 async function extractPrice(page: Page): Promise<number> {
   try {
-    // Try multiple selectors for price
+    // Try multiple selectors for price, in order of specificity
     const selectors = [
       'fin-streamer[data-field="regularMarketPrice"][data-test="qsp-price"]',
       'fin-streamer[data-field="regularMarketPrice"]',
@@ -227,40 +227,96 @@ async function extractPrice(page: Page): Promise<number> {
 
     for (const selector of selectors) {
       const elements = await page.$$(selector);
+
+      // For fin-streamer elements, prioritize the most visible/primary one
+      // Usually the first one with the most specific selector is the main price
       for (const element of elements) {
         if (!element) continue;
+
+        // PRIORITY 1: Try to get value from data attributes (most reliable)
+        const dataValue = await element.getAttribute('data-value');
+        if (dataValue) {
+          const price = parseFloat(dataValue);
+          if (!isNaN(price) && price > 0 && price < 1000000) {
+            console.log(`Extracted price ${price} from data-value attribute using selector: ${selector}`);
+            return price;
+          }
+        }
+
+        // PRIORITY 2: Try the 'value' attribute
+        const valueAttr = await element.getAttribute('value');
+        if (valueAttr) {
+          const price = parseFloat(valueAttr);
+          if (!isNaN(price) && price > 0 && price < 1000000) {
+            console.log(`Extracted price ${price} from value attribute using selector: ${selector}`);
+            return price;
+          }
+        }
+
+        // PRIORITY 3: Try textContent as fallback (less reliable due to formatting)
         const text = await element.textContent();
         if (text) {
-          // Remove currency symbols, commas, etc.
-          const cleanText = text.replace(/[^0-9.]/g, '');
-          const price = parseFloat(cleanText);
-          // Sanity check: price must be positive and look like a price (not a timestamp)
-          if (!isNaN(price) && price > 0) {
-            // Fix for specific invalid price often scraped (timestamp/glitch)
-            if (price === 95061.1) {
-              continue;
+          const price = parseFormattedNumber(text);
+          if (price !== undefined && price > 0 && price < 1000000) {
+            // Sanity check: filter out obvious non-price values
+            if (price === 95061.1 || price > 100000) {
+              continue; // Likely not a stock price
             }
-            console.log(`Extracted price ${price} using selector: ${selector}`);
+            console.log(`Extracted price ${price} from textContent using selector: ${selector}`);
             return price;
           }
         }
       }
     }
 
-    // Regex fallback on whole page text (last resort)
+    // Regex fallback on whole page source (last resort, most reliable)
     const content = await page.content();
-    // Look for "regularMarketPrice":{"raw":123.45
-    const priceMatch = content.match(/"regularMarketPrice":\{"raw":([0-9.]+)/);
+    // Look for "regularMarketPrice":{"raw":123.45,"fmt":"123.45"}
+    const priceMatch = content.match(/"regularMarketPrice":\s*\{\s*"raw"\s*:\s*([0-9.]+)/);
     if (priceMatch && priceMatch[1]) {
       const price = parseFloat(priceMatch[1]);
-      console.log(`Extracted price ${price} using regex fallback`);
-      return price;
+      if (!isNaN(price) && price > 0) {
+        console.log(`Extracted price ${price} using JSON regex fallback`);
+        return price;
+      }
     }
 
     throw new Error('Price not found');
   } catch (error) {
     throw new Error(`Failed to extract price: ${(error as Error).message}`);
   }
+}
+
+/**
+ * Parse a formatted number that might use commas, spaces, or other separators
+ * Handles both US format (1,234.56) and EU format (1.234,56 or 1 234,56)
+ */
+function parseFormattedNumber(text: string): number | undefined {
+  if (!text || text === 'N/A' || text === '—' || text === '-') {
+    return undefined;
+  }
+
+  // Remove currency symbols, letters, and extra whitespace
+  let cleaned = text.replace(/[^\d.,\s-]/g, '').trim();
+
+  if (!cleaned) return undefined;
+
+  // Detect format by looking at the last separator
+  // If last separator is comma, it's likely EU format (decimal comma)
+  // If last separator is dot, it's likely US format (decimal dot)
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+
+  if (lastComma > lastDot) {
+    // EU format: 1.234,56 or 1 234,56 -> convert to US format
+    cleaned = cleaned.replace(/[\s.]/g, '').replace(',', '.');
+  } else {
+    // US format: 1,234.56 -> remove commas
+    cleaned = cleaned.replace(/[,\s]/g, '');
+  }
+
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? undefined : num;
 }
 
 async function extractCurrency(ticker: string): Promise<string> {
@@ -356,14 +412,13 @@ function parseRatioValue(text: string): number | undefined {
     return undefined;
   }
 
-  // Remove % sign and convert to decimal
+  // Handle percentage values
   if (text.includes('%')) {
-    const num = parseFloat(text.replace(/[^0-9.-]/g, ''));
-    return isNaN(num) ? undefined : num / 100;
+    const num = parseFormattedNumber(text.replace('%', ''));
+    return num !== undefined ? num / 100 : undefined;
   }
 
-  const num = parseFloat(text.replace(/[^0-9.-]/g, ''));
-  return isNaN(num) ? undefined : num;
+  return parseFormattedNumber(text);
 }
 
 function parseMarketCap(text: string): number | undefined {
@@ -376,17 +431,18 @@ function parseMarketCap(text: string): number | undefined {
     K: 1_000,
   };
 
-  const match = text.match(/([0-9.]+)([TBMK])/i);
+  // Check for T/B/M/K suffix (common in financial data)
+  const match = text.match(/([0-9.,\s]+)([TBMK])/i);
   if (match && match[1] && match[2]) {
-    const value = parseFloat(match[1]);
+    const value = parseFormattedNumber(match[1]);
     const multiplier = multipliers[match[2].toUpperCase()];
-    if (multiplier !== undefined) {
+    if (value !== undefined && multiplier !== undefined) {
       return value * multiplier;
     }
   }
 
-  const num = parseFloat(text.replace(/[^0-9.-]/g, ''));
-  return isNaN(num) ? undefined : num;
+  // No multiplier, parse as regular number
+  return parseFormattedNumber(text);
 }
 
 async function extractFinancialData(page: Page, ticker: string, tab: string, labelMap: Record<string, keyof FinancialRatios>): Promise<Partial<FinancialRatios>> {
