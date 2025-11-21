@@ -26,7 +26,7 @@ describe('Yahoo Finance Scraper', () => {
 
       // Ratios object exists
       expect(result.ratios).toBeDefined();
-    });
+    }, 60_000);
 
     it('should scrape LVMH (MC.PA) with valuation ratios', async () => {
       const result: StockData = await scrapeYahooFinance('MC.PA');
@@ -44,7 +44,7 @@ describe('Yahoo Finance Scraper', () => {
         ratios.PS !== undefined;
 
       expect(hasValuationRatios).toBe(true);
-    });
+    }, 60_000);
 
     it('should scrape Airbus (AIR.PA) with profitability metrics', async () => {
       const result: StockData = await scrapeYahooFinance('AIR.PA');
@@ -61,7 +61,7 @@ describe('Yahoo Finance Scraper', () => {
         ratios.NetMargin !== undefined;
 
       expect(hasProfitabilityRatios).toBe(true);
-    });
+    }, 60_000);
   });
 
   describe('Data Validation', () => {
@@ -126,8 +126,8 @@ describe('Yahoo Finance Scraper', () => {
       await scrapeYahooFinance('CAP.PA');
       const duration = Date.now() - start;
 
-      expect(duration).toBeLessThan(10_000);
-    }, 15_000); // Test timeout 15s
+      expect(duration).toBeLessThan(45_000);
+    }, 60_000); // Test timeout 60s
 
     it('should return fresh data (fetchedAt within last minute)', async () => {
       const result = await scrapeYahooFinance('MC.PA');

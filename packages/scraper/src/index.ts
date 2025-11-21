@@ -31,9 +31,12 @@ export interface StockData {
 export interface FinancialRatios {
   // Valuation
   PE?: number; // Price-to-Earnings
-  PB?: number; // Price-to-Book
   PEG?: number; // PEG Ratio
+  PB?: number; // Price-to-Book (PTB)
   PS?: number; // Price-to-Sales
+  PCF?: number; // Price-to-Cash-Flow
+  PFCF?: number; // Price-to-Free-Cash-Flow
+  EV_EBITDA?: number; // Enterprise Value to EBITDA
 
   // Profitability
   ROE?: number; // Return on Equity
@@ -42,25 +45,70 @@ export interface FinancialRatios {
   GrossMargin?: number;
   OperatingMargin?: number;
   NetMargin?: number;
+  FCFMargin?: number;
+  CashReturn?: number;
 
-  // Debt
-  DebtToEquity?: number;
-  DebtToEBITDA?: number;
+  // Liquidity
   CurrentRatio?: number;
   QuickRatio?: number;
+  CashRatio?: number;
 
-  // Dividends
-  DividendYield?: number;
-  PayoutRatio?: number;
+  // Debt & Solvency
+  DebtToEquity?: number;
+  DebtToAssets?: number;
+  DebtToRevenue?: number;
+  InterestCoverage?: number;
+  NetDebtToEBITDA?: number;
+  DebtToEBITDA?: number; // New
+
+  // Efficiency
+  AssetTurnover?: number;
+  InventoryTurnover?: number;
+  ReceivablesTurnover?: number;
+  PayablesTurnover?: number;
 
   // Growth
   RevenueGrowth?: number; // YoY %
   EPSGrowth?: number; // YoY %
   BookValueGrowth?: number; // YoY %
+  IGR?: number; // Internal Growth Rate
+  SGR?: number; // Sustainable Growth Rate
+
+  // Dividends
+  DividendYield?: number;
+  PayoutRatio?: number;
 
   // Other
   MarketCap?: number;
   Beta?: number;
+
+  // Raw Data (for calculations & display)
+  Revenue?: number;
+  GrossProfit?: number;
+  OperatingIncome?: number;
+  NetIncome?: number;
+  InterestExpense?: number;
+  EBITDA?: number;
+  EBIT?: number;
+
+  TotalAssets?: number;
+  TotalLiabilities?: number;
+  TotalEquity?: number;
+  TotalCurrentAssets?: number; // New
+  TotalCurrentLiabilities?: number; // New
+  CashAndEquivalents?: number;
+  ShortTermDebt?: number;
+  LongTermDebt?: number;
+  TotalDebt?: number;
+  Inventory?: number;
+  AccountsReceivable?: number;
+  AccountsPayable?: number;
+  WorkingCapital?: number;
+
+  OperatingCashFlow?: number;
+  FreeCashFlow?: number;
+  CAPEX?: number;
+  DividendsPaid?: number;
 }
 
 export interface TickerResolution {

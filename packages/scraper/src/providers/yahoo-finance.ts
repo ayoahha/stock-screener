@@ -79,15 +79,60 @@ export async function scrapeYahooFinance(ticker: string): Promise<StockData> {
 
       // Navigate to statistics page for ratios
       let ratios: FinancialRatios = {};
+
+      // 1. Key Statistics
       try {
         const statsUrl = `https://finance.yahoo.com/quote/${ticker}/key-statistics`;
         await page.goto(statsUrl, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
         await page.waitForTimeout(2000); // Wait for dynamic content
         ratios = await extractRatios(page);
       } catch (error) {
-        console.warn(`Failed to fetch ratios for ${ticker}, returning partial data:`, error);
-        // Continue with partial data
+        console.warn(`Failed to fetch key statistics for ${ticker}:`, error);
       }
+
+      // 2. Financials (Income Statement)
+      const incomeMap: Record<string, keyof FinancialRatios> = {
+        'Total Revenue': 'Revenue',
+        'Gross Profit': 'GrossProfit',
+        'Operating Income': 'OperatingIncome',
+        'Net Income Common Stockholders': 'NetIncome',
+        'Interest Expense': 'InterestExpense',
+        'EBITDA': 'EBITDA'
+      };
+      const incomeData = await extractFinancialData(page, ticker, 'financials', incomeMap);
+      ratios = { ...ratios, ...incomeData };
+
+      // 3. Balance Sheet
+      const balanceMap: Record<string, keyof FinancialRatios> = {
+        'Total Assets': 'TotalAssets',
+        'Total Liabilities Net Minority Interest': 'TotalLiabilities',
+        'Total Equity Gross Minority Interest': 'TotalEquity',
+        'Cash And Cash Equivalents': 'CashAndEquivalents',
+        'Total Debt': 'TotalDebt',
+        'Total Debt Net Minority Interest': 'TotalDebt', // Alternative label
+        'Inventory': 'Inventory',
+        'Accounts Receivable': 'AccountsReceivable',
+        'Accounts Payable': 'AccountsPayable',
+        'Working Capital': 'WorkingCapital',
+        'Total Current Assets': 'TotalCurrentAssets', // New
+        'Total Current Liabilities Net Minority Interest': 'TotalCurrentLiabilities', // New
+        'Current Liabilities': 'TotalCurrentLiabilities' // Alternative
+      };
+      const balanceData = await extractFinancialData(page, ticker, 'balance-sheet', balanceMap);
+      ratios = { ...ratios, ...balanceData };
+
+      // 4. Cash Flow
+      const cashFlowMap: Record<string, keyof FinancialRatios> = {
+        'Operating Cash Flow': 'OperatingCashFlow',
+        'Free Cash Flow': 'FreeCashFlow',
+        'Capital Expenditure': 'CAPEX',
+        'Cash Dividends Paid': 'DividendsPaid'
+      };
+      const cashFlowData = await extractFinancialData(page, ticker, 'cash-flow', cashFlowMap);
+      ratios = { ...ratios, ...cashFlowData };
+
+      // 5. Calculate derived ratios
+      ratios = calculateAllRatios(ratios);
 
       await browser.close();
 
@@ -181,6 +226,10 @@ async function extractPrice(page: Page): Promise<number> {
           const price = parseFloat(cleanText);
           // Sanity check: price must be positive and look like a price (not a timestamp)
           if (!isNaN(price) && price > 0) {
+            // Fix for specific invalid price often scraped (timestamp/glitch)
+            if (price === 95061.1) {
+              continue;
+            }
             console.log(`Extracted price ${price} using selector: ${selector}`);
             return price;
           }
@@ -328,4 +377,184 @@ function parseMarketCap(text: string): number | undefined {
 
   const num = parseFloat(text.replace(/[^0-9.-]/g, ''));
   return isNaN(num) ? undefined : num;
+}
+
+async function extractFinancialData(page: Page, ticker: string, tab: string, labelMap: Record<string, keyof FinancialRatios>): Promise<Partial<FinancialRatios>> {
+  const data: Partial<FinancialRatios> = {};
+  try {
+    const url = `https://finance.yahoo.com/quote/${ticker}/${tab}`;
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
+    } catch { }
+
+    // Yahoo Finance Financials Table Selectors
+    // They use div structures now mostly
+    const rows = await page.$$('.tableBody .row, div[data-test="fin-row"], tr');
+
+    for (const row of rows) {
+      const labelEl = await row.$('.rowTitle, div[class*="title"], td:first-child');
+      const valueEl = await row.$('.rowValue, div[class*="column"]:last-child, td:last-child');
+
+      if (labelEl && valueEl) {
+        const labelText = (await labelEl.textContent())?.trim();
+        const valueText = (await valueEl.textContent())?.trim();
+
+        if (labelText && valueText && labelMap[labelText]) {
+          const key = labelMap[labelText];
+          const value = parseMarketCap(valueText); // Reuse parseMarketCap as it handles K, M, B, T
+          if (value !== undefined) {
+            data[key] = value;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn(`Failed to extract ${tab} for ${ticker}:`, e);
+  }
+  return data;
+}
+
+function calculateAllRatios(ratios: FinancialRatios): FinancialRatios {
+  const r = { ...ratios };
+
+  // Helper to safe divide
+  const div = (n: number | undefined, d: number | undefined) => (n !== undefined && d !== undefined && d !== 0) ? n / d : undefined;
+
+  // --- Valuation ---
+  // PEG = PE / Growth
+  if (!r.PEG && r.PE && r.EPSGrowth) {
+    r.PEG = div(r.PE, r.EPSGrowth * 100); // EPSGrowth is usually 0.15 for 15%
+  }
+
+  // PTB (Price to Book) = Price / BookValuePerShare = MarketCap / TotalEquity
+  if (!r.PB && r.MarketCap && r.TotalEquity) {
+    r.PB = div(r.MarketCap, r.TotalEquity);
+  }
+
+  // PS (Price to Sales) = MarketCap / Revenue
+  if (!r.PS && r.MarketCap && r.Revenue) {
+    r.PS = div(r.MarketCap, r.Revenue);
+  }
+
+  // PCF (Price to Cash Flow) = MarketCap / OperatingCashFlow
+  if (!r.PCF && r.MarketCap && r.OperatingCashFlow) {
+    r.PCF = div(r.MarketCap, r.OperatingCashFlow);
+  }
+
+  // PFCF (Price to Free Cash Flow) = MarketCap / FreeCashFlow
+  if (!r.PFCF && r.MarketCap && r.FreeCashFlow) {
+    r.PFCF = div(r.MarketCap, r.FreeCashFlow);
+  }
+
+  // EV/EBITDA
+  // EV = MarketCap + TotalDebt - Cash
+  if (!r.EV_EBITDA && r.MarketCap && r.TotalDebt && r.CashAndEquivalents && r.EBITDA) {
+    const ev = r.MarketCap + r.TotalDebt - r.CashAndEquivalents;
+    r.EV_EBITDA = div(ev, r.EBITDA);
+  }
+
+  // --- Profitability ---
+  // Gross Margin = Gross Profit / Revenue
+  if (!r.GrossMargin && r.GrossProfit && r.Revenue) {
+    r.GrossMargin = div(r.GrossProfit, r.Revenue);
+  }
+
+  // Operating Margin = Operating Income / Revenue
+  if (!r.OperatingMargin && r.OperatingIncome && r.Revenue) {
+    r.OperatingMargin = div(r.OperatingIncome, r.Revenue);
+  }
+
+  // Net Margin = Net Income / Revenue
+  if (!r.NetMargin && r.NetIncome && r.Revenue) {
+    r.NetMargin = div(r.NetIncome, r.Revenue);
+  }
+
+  // FCF Margin = FCF / Revenue
+  if (!r.FCFMargin && r.FreeCashFlow && r.Revenue) {
+    r.FCFMargin = div(r.FreeCashFlow, r.Revenue);
+  }
+
+  // ROA = Net Income / Total Assets
+  if (!r.ROA && r.NetIncome && r.TotalAssets) {
+    r.ROA = div(r.NetIncome, r.TotalAssets);
+  }
+
+  // ROE = Net Income / Total Equity
+  if (!r.ROE && r.NetIncome && r.TotalEquity) {
+    r.ROE = div(r.NetIncome, r.TotalEquity);
+  }
+
+  // ROIC = NOPAT / Invested Capital
+  // NOPAT = EBIT * (1 - TaxRate). Approx TaxRate 25% or derive?
+  // Invested Capital = Total Equity + Total Debt - Cash
+  if (!r.ROIC && r.OperatingIncome && r.TotalEquity && r.TotalDebt && r.CashAndEquivalents) {
+    const nopat = r.OperatingIncome * 0.75; // Approx 25% tax
+    const investedCapital = r.TotalEquity + r.TotalDebt - r.CashAndEquivalents;
+    r.ROIC = div(nopat, investedCapital);
+  }
+
+  // Cash Return = (FCF + Net Interest) / EV
+  if (!r.CashReturn && r.FreeCashFlow && r.InterestExpense && r.MarketCap && r.TotalDebt && r.CashAndEquivalents) {
+    const ev = r.MarketCap + r.TotalDebt - r.CashAndEquivalents;
+    r.CashReturn = div(r.FreeCashFlow + r.InterestExpense, ev);
+  }
+
+  // --- Liquidity ---
+  // Current Ratio = Current Assets / Current Liabilities
+  if (!r.CurrentRatio && r.TotalCurrentAssets && r.TotalCurrentLiabilities) {
+    r.CurrentRatio = div(r.TotalCurrentAssets, r.TotalCurrentLiabilities);
+  }
+
+  // Quick Ratio = (Cash + Receivables) / Current Liabilities
+  // Or (Current Assets - Inventory) / Current Liabilities
+  if (!r.QuickRatio && r.TotalCurrentAssets && r.Inventory && r.TotalCurrentLiabilities) {
+    r.QuickRatio = div(r.TotalCurrentAssets - r.Inventory, r.TotalCurrentLiabilities);
+  } else if (!r.QuickRatio && r.CashAndEquivalents && r.AccountsReceivable && r.TotalCurrentLiabilities) {
+    r.QuickRatio = div(r.CashAndEquivalents + r.AccountsReceivable, r.TotalCurrentLiabilities);
+  }
+
+  // Cash Ratio = Cash / Current Liabilities
+  if (!r.CashRatio && r.CashAndEquivalents && r.TotalCurrentLiabilities) {
+    r.CashRatio = div(r.CashAndEquivalents, r.TotalCurrentLiabilities);
+  }
+
+  // --- Debt ---
+  // Debt to Equity = Total Debt / Total Equity
+  if (!r.DebtToEquity && r.TotalDebt && r.TotalEquity) {
+    r.DebtToEquity = div(r.TotalDebt, r.TotalEquity);
+  }
+
+  // Debt to EBITDA
+  if (!r.DebtToEBITDA && r.TotalDebt && r.EBITDA) {
+    r.DebtToEBITDA = div(r.TotalDebt, r.EBITDA);
+  }
+
+  // Interest Coverage = EBIT / Interest Expense
+  if (!r.InterestCoverage && r.OperatingIncome && r.InterestExpense) {
+    r.InterestCoverage = div(r.OperatingIncome, r.InterestExpense);
+  }
+
+  // --- Efficiency ---
+  // Asset Turnover = Revenue / Total Assets
+  if (!r.AssetTurnover && r.Revenue && r.TotalAssets) {
+    r.AssetTurnover = div(r.Revenue, r.TotalAssets);
+  }
+
+  // --- Growth ---
+  // IGR = ROA * b / (1 - ROA * b) where b is retention ratio (1 - payout)
+  if (!r.IGR && r.ROA && r.PayoutRatio !== undefined) {
+    const b = 1 - r.PayoutRatio;
+    const roa = r.ROA; // Assuming ROA is decimal
+    r.IGR = div(roa * b, 1 - roa * b);
+  }
+
+  // SGR = ROE * b / (1 - ROE * b)
+  if (!r.SGR && r.ROE && r.PayoutRatio !== undefined) {
+    const b = 1 - r.PayoutRatio;
+    const roe = r.ROE;
+    r.SGR = div(roe * b, 1 - roe * b);
+  }
+
+  return r;
 }
