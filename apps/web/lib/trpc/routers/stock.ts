@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '../server';
 import { fetchStockData, resolveTicker } from '@stock-screener/scraper';
 
@@ -24,8 +25,17 @@ export const stockRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // Fetch real stock data using scraper (Yahoo Finance → FMP fallback)
-      return await fetchStockData(input.ticker);
+      try {
+        // Fetch real stock data using scraper (Yahoo Finance → FMP fallback)
+        return await fetchStockData(input.ticker);
+      } catch (error) {
+        console.error(`Error fetching stock ${input.ticker}:`, error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: error instanceof Error ? error.message : 'Failed to fetch stock data',
+          cause: error,
+        });
+      }
     }),
 
   /**

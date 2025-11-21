@@ -20,23 +20,30 @@ export async function fetchFromFMP(ticker: string): Promise<StockData> {
     throw new Error('Ticker cannot be empty');
   }
 
-  const apiKey = process.env.FMP_API_KEY || 'demo';
+  const apiKey = process.env.FMP_API_KEY;
+  if (!apiKey || apiKey === 'demo') {
+    console.warn('FMP_API_KEY is missing or set to "demo". FMP calls may fail or be limited.');
+  }
 
   let attempt = 0;
   while (attempt < MAX_RETRIES) {
     try {
-      // Fetch quote data
-      const quoteUrl = `${FMP_BASE_URL}/quote/${ticker}?apikey=${apiKey}`;
-      const quoteResponse = await axios.get(quoteUrl, { timeout: 10000 });
+      // Fetch profile data (replaces legacy quote endpoint)
+      const profileUrl = `${FMP_BASE_URL}/profile/${ticker}?apikey=${apiKey || 'demo'}`;
+      const profileResponse = await axios.get(profileUrl, { timeout: 10000 });
 
-      if (!quoteResponse.data || quoteResponse.data.length === 0) {
+      if (!profileResponse.data || profileResponse.data.length === 0) {
+        // FMP returns empty array for invalid ticker, but sometimes 404/403 for other issues
+        if (profileResponse.status === 403) {
+           throw new Error('FMP API Key Invalid or Quota Exceeded (403)');
+        }
         throw new Error(`No data found for ticker: ${ticker}`);
       }
 
-      const quote = quoteResponse.data[0];
+      const profile = profileResponse.data[0];
 
       // Fetch ratios
-      const ratiosUrl = `${FMP_BASE_URL}/ratios/${ticker}?apikey=${apiKey}`;
+      const ratiosUrl = `${FMP_BASE_URL}/ratios/${ticker}?apikey=${apiKey || 'demo'}`;
       let ratios: FinancialRatios = {};
 
       try {
@@ -48,25 +55,34 @@ export async function fetchFromFMP(ticker: string): Promise<StockData> {
         // Ratios optional, continue without them
       }
 
-      // Detect currency from ticker
-      const currency = detectCurrency(ticker);
+      // Detect currency from ticker or profile
+      const currency = profile.currency || detectCurrency(ticker);
 
       return {
         ticker,
-        name: quote.name || ticker,
-        price: parseFloat(quote.price) || 0,
+        name: profile.companyName || profile.name || ticker,
+        price: parseFloat(profile.price) || 0,
         currency,
         ratios: {
           ...ratios,
-          PE: quote.pe || ratios.PE,
-          MarketCap: quote.marketCap || ratios.MarketCap,
-          Beta: quote.beta || ratios.Beta,
+          PE: ratios.PE, // Profile doesn't have PE usually, rely on ratios endpoint
+          MarketCap: parseFloat(profile.mktCap) || parseFloat(profile.marketCap) || ratios.MarketCap,
+          Beta: parseFloat(profile.beta) || ratios.Beta,
         },
         source: 'fmp',
         fetchedAt: new Date(),
       };
     } catch (error) {
       attempt++;
+
+      // Enhanced error logging for Axios errors
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 403) {
+          console.error(`FMP 403 Forbidden for ${ticker}. Check FMP_API_KEY. Response:`, error.response.data);
+          throw new Error(`FMP API Key Invalid or Quota Exceeded (403). Details: ${JSON.stringify(error.response.data)}`);
+        }
+      }
+
       if (attempt >= MAX_RETRIES) {
         throw new Error(
           `Failed to fetch from FMP after ${MAX_RETRIES} attempts: ${(error as Error).message}`

@@ -16,7 +16,12 @@ let supabaseClient: ReturnType<typeof createBrowserClient> | null = null;
 
 function getSupabaseClient() {
   if (!supabaseClient) {
-    supabaseClient = createBrowserClient();
+    try {
+      supabaseClient = createBrowserClient();
+    } catch (error) {
+      console.warn('Failed to initialize Supabase client in cache manager:', error);
+      return null;
+    }
   }
   return supabaseClient;
 }
@@ -27,6 +32,7 @@ function getSupabaseClient() {
 export async function getCachedStockData(ticker: string): Promise<StockData | null> {
   try {
     const supabase = getSupabaseClient();
+    if (!supabase) return null;
 
     const { data, error } = await supabase
       .from('stock_cache')
@@ -74,6 +80,7 @@ export async function setCachedStockData(
 ): Promise<void> {
   try {
     const supabase = getSupabaseClient();
+    if (!supabase) return;
 
     const now = new Date();
     const expiresAt = new Date(now.getTime() + ttlSeconds * 1000);
@@ -111,6 +118,7 @@ export async function setCachedStockData(
 export async function invalidateCache(ticker?: string): Promise<void> {
   try {
     const supabase = getSupabaseClient();
+    if (!supabase) return;
 
     if (ticker) {
       // Invalidate specific ticker
