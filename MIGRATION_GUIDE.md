@@ -136,10 +136,15 @@ After running migrations 004 and 005, you'll see one remaining warning about the
 - ✅ Prevents potential SQL injection via search_path manipulation
 - ✅ Ensures function always operates in expected schema context
 
-**The SQL (short and simple):**
+**The SQL:**
 ```sql
+-- Step 1: Drop the trigger that depends on the function
+DROP TRIGGER IF EXISTS stock_history_increment_fetch ON stock_history;
+
+-- Step 2: Drop the existing function
 DROP FUNCTION IF EXISTS increment_fetch_count();
 
+-- Step 3: Recreate function with explicit search_path
 CREATE OR REPLACE FUNCTION increment_fetch_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -155,6 +160,12 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+-- Step 4: Recreate the trigger
+CREATE TRIGGER stock_history_increment_fetch
+  BEFORE UPDATE ON stock_history
+  FOR EACH ROW
+  EXECUTE FUNCTION increment_fetch_count();
 ```
 
 ## What This Migration Creates

@@ -6,10 +6,13 @@
 -- Fix: Recreate increment_fetch_count function with explicit search_path
 -- ============================================================================
 
--- Drop the existing function
+-- Step 1: Drop the trigger that depends on the function
+DROP TRIGGER IF EXISTS stock_history_increment_fetch ON stock_history;
+
+-- Step 2: Drop the existing function
 DROP FUNCTION IF EXISTS increment_fetch_count();
 
--- Recreate with explicit search_path set to 'public'
+-- Step 3: Recreate function with explicit search_path set to 'public'
 CREATE OR REPLACE FUNCTION increment_fetch_count()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -28,8 +31,15 @@ BEGIN
 END;
 $$;
 
+-- Step 4: Recreate the trigger
+CREATE TRIGGER stock_history_increment_fetch
+  BEFORE UPDATE ON stock_history
+  FOR EACH ROW
+  EXECUTE FUNCTION increment_fetch_count();
+
 -- ============================================================================
--- Comment for documentation
+-- Comments for documentation
 -- ============================================================================
 
 COMMENT ON FUNCTION increment_fetch_count() IS 'Auto-increment fetch_count and update last_fetched_at on stock_history updates - search_path secured';
+COMMENT ON TRIGGER stock_history_increment_fetch ON stock_history IS 'Auto-increment fetch_count on updates';
