@@ -311,7 +311,19 @@ export const historyRouter = router({
       .select('*')
       .single();
 
+    // Handle case where database is empty (view returns no rows or PGRST116 error)
     if (error) {
+      if (error.code === 'PGRST116') {
+        // No rows found - return default empty stats
+        return {
+          total_stocks: 0,
+          value_stocks: 0,
+          growth_stocks: 0,
+          dividend_stocks: 0,
+          average_score: null,
+          last_update: null,
+        };
+      }
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Failed to fetch history statistics',
