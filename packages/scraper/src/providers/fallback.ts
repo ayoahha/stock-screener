@@ -1,9 +1,11 @@
 /**
  * Orchestrateur de fallback intelligent
  *
- * Logique (mise à jour 2025) :
- * 1. Tente Yahoo Finance Query API - Priorité 1 (rapide, fiable, sans scraping)
- * 2. Si échec → Yahoo Finance Scraping - Priorité 2 (plus de données, plus lent)
+ * Logique (mise à jour Nov 2025) :
+ * 1. [OPTIONAL] Yahoo Finance Query API - Priorité 1 (rapide mais nécessite auth cookie/crumb)
+ *    - DÉSACTIVÉ PAR DÉFAUT pour éviter le blocage IP (erreurs 401)
+ *    - Pour l'activer : ENABLE_YAHOO_QUERY_API=true
+ * 2. Yahoo Finance Scraping - Priorité 1 ou 2 (plus de données, plus lent mais fiable)
  * 3. Si échec → FMP API - Priorité 3 (fallback final, mais endpoint legacy)
  * 4. Si échec → throw error avec détails
  *
@@ -12,6 +14,7 @@
  * - Tracking des erreurs
  * - Log des sources utilisées
  * - Validation des prix
+ * - Protection contre le rate limiting Yahoo (Query API désactivé par défaut)
  */
 
 import type { StockData } from '../index';
@@ -25,6 +28,10 @@ interface FallbackAttempt {
   duration?: number;
 }
 
+// Yahoo Query API is DISABLED by default to avoid IP blocks from 401 errors
+// Enable with: ENABLE_YAHOO_QUERY_API=true in environment
+const ENABLE_YAHOO_QUERY_API = process.env.ENABLE_YAHOO_QUERY_API === 'true';
+
 export async function fetchWithFallback(ticker: string): Promise<StockData> {
   if (!ticker || ticker.trim() === '') {
     throw new Error('Ticker cannot be empty');
@@ -33,23 +40,28 @@ export async function fetchWithFallback(ticker: string): Promise<StockData> {
   const attempts: FallbackAttempt[] = [];
   let lastError: Error | null = null;
 
-  // Strategy 1: Yahoo Finance Query API (fast and reliable)
-  // Uses unofficial but stable JSON API endpoint
-  try {
-    console.log(`[Fallback] Attempting Yahoo Query API for ${ticker}...`);
-    const startTime = Date.now();
+  // Strategy 1: Yahoo Finance Query API (OPTIONAL - disabled by default)
+  // NOTE: Currently returns 401 errors without cookie/crumb authentication
+  // See: .github/ISSUE_YAHOO_API_AUTH.md for implementation details
+  if (ENABLE_YAHOO_QUERY_API) {
+    try {
+      console.log(`[Fallback] Attempting Yahoo Query API for ${ticker}...`);
+      const startTime = Date.now();
 
-    const data = await fetchFromYahooQueryAPI(ticker);
+      const data = await fetchFromYahooQueryAPI(ticker);
 
-    const duration = Date.now() - startTime;
-    attempts.push({ source: 'yahoo-query', duration });
+      const duration = Date.now() - startTime;
+      attempts.push({ source: 'yahoo-query', duration });
 
-    console.log(`[Fallback] ✓ Yahoo Query API succeeded in ${duration}ms`);
-    return data;
-  } catch (error) {
-    lastError = error as Error;
-    attempts.push({ source: 'yahoo-query', error: lastError });
-    console.log(`[Fallback] ✗ Yahoo Query API failed: ${lastError.message}`);
+      console.log(`[Fallback] ✓ Yahoo Query API succeeded in ${duration}ms`);
+      return data;
+    } catch (error) {
+      lastError = error as Error;
+      attempts.push({ source: 'yahoo-query', error: lastError });
+      console.log(`[Fallback] ✗ Yahoo Query API failed: ${lastError.message}`);
+    }
+  } else {
+    console.log(`[Fallback] Yahoo Query API disabled (set ENABLE_YAHOO_QUERY_API=true to enable)`);
   }
 
   // Strategy 2: Yahoo Finance HTML Scraping (slower but more comprehensive)
