@@ -12,32 +12,8 @@
 
 import type { ProfileType } from './index';
 
-export interface FinancialRatios {
-  // Valuation
-  PE?: number;
-  PB?: number;
-  PS?: number;
-  PCF?: number;
-  PEG?: number;
-
-  // Growth
-  RevenueGrowth?: number;
-  EPSGrowth?: number;
-  BookValueGrowth?: number;
-
-  // Dividend
-  DividendYield?: number;
-  PayoutRatio?: number;
-
-  // Profitability
-  ROE?: number;
-  ROA?: number;
-  ROIC?: number;
-  NetMargin?: number;
-
-  // Other
-  [key: string]: number | undefined;
-}
+// Use a flexible type that accepts any ratio record
+type FinancialRatios = Record<string, number | undefined>;
 
 export interface ClassificationResult {
   type: ProfileType;

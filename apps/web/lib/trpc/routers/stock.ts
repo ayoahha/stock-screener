@@ -14,7 +14,7 @@ import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '../server';
 import { fetchStockData, resolveTicker } from '@stock-screener/scraper';
 import { classifyStock, calculateScore, defaultProfiles } from '@stock-screener/scoring';
-import { createServerClient } from '@stock-screener/database/client';
+import { createServerClient } from '@stock-screener/database';
 
 export const stockRouter = router({
   /**
@@ -36,16 +36,16 @@ export const stockRouter = router({
         const stockData = await fetchStockData(input.ticker);
 
         // 2. Classify stock type (value, growth, dividend)
-        const stockType = classifyStock(stockData.ratios);
+        const stockType = classifyStock(stockData.ratios as Record<string, number | undefined>);
 
         // 3. Calculate score using the appropriate profile
         const profile = defaultProfiles[stockType];
-        const scoringResult = calculateScore(stockData.ratios, profile);
+        const scoringResult = calculateScore(stockData.ratios as Record<string, number | undefined>, profile);
 
         // 4. Auto-save to history (non-blocking, errors logged but not thrown)
         try {
           const supabase = createServerClient();
-          await supabase.from('stock_history').upsert(
+          await (supabase.from('stock_history') as any).upsert(
             {
               ticker: stockData.ticker.toUpperCase(),
               name: stockData.name,

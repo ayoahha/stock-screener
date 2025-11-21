@@ -13,7 +13,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '../server';
-import { createServerClient } from '@stock-screener/database/client';
+import { createServerClient } from '@stock-screener/database';
 import { fetchStockData } from '@stock-screener/scraper';
 
 // Schémas de validation
@@ -161,8 +161,8 @@ export const historyRouter = router({
     .mutation(async ({ input }) => {
       const supabase = createServerClient();
 
-      const { data, error } = await supabase
-        .from('stock_history')
+      const { data, error } = await (supabase
+        .from('stock_history') as any)
         .upsert(
           {
             ticker: input.ticker.toUpperCase(),
@@ -251,8 +251,8 @@ export const historyRouter = router({
       // Get existing stock type if not provided
       let stockType = input.stockType;
       if (!stockType) {
-        const { data: existing } = await supabase
-          .from('stock_history')
+        const { data: existing } = await (supabase
+          .from('stock_history') as any)
           .select('stock_type')
           .eq('ticker', input.ticker.toUpperCase())
           .single();
@@ -266,8 +266,8 @@ export const historyRouter = router({
       const verdict = null;
 
       // Update history
-      const { data, error } = await supabase
-        .from('stock_history')
+      const { data, error } = await (supabase
+        .from('stock_history') as any)
         .upsert(
           {
             ticker: stockData.ticker.toUpperCase(),

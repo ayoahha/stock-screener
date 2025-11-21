@@ -19,9 +19,12 @@ import {
 } from 'lucide-react';
 import { formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import type { Database } from '@stock-screener/database';
 
 type SortField = 'lastFetched' | 'score' | 'name' | 'ticker';
 type SortOrder = 'asc' | 'desc';
+type StockHistoryItem = Database['public']['Tables']['stock_history']['Row'];
+type StockHistoryStats = Database['public']['Views']['stock_history_stats']['Row'];
 
 export default function HistoriquePage() {
   const router = useRouter();
@@ -47,7 +50,7 @@ export default function HistoriquePage() {
   });
 
   // Fetch stats
-  const { data: stats } = trpc.history.stats.useQuery();
+  const { data: stats } = trpc.history.stats.useQuery() as { data: StockHistoryStats | undefined };
 
   // Refresh mutation
   const refreshMutation = trpc.history.refresh.useMutation({
@@ -255,7 +258,7 @@ export default function HistoriquePage() {
                     </td>
                   </tr>
                 ) : (
-                  historyData.items.map((stock) => (
+                  historyData.items.map((stock: StockHistoryItem) => (
                     <tr key={stock.ticker} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {stock.ticker}
