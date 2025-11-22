@@ -250,46 +250,27 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
     console.log(`[Price Extraction] Starting extraction for ${ticker}`);
 
     // STRATEGY 1: Try multiple specific selectors for the live price element
-    // Yahoo Finance uses fin-streamer elements with data-symbol attribute
     const priceSelectors = [
-      // Most specific - main quote price with data-symbol
       `fin-streamer[data-symbol="${ticker}"][data-field="regularMarketPrice"]`,
-      // Fallback - any regularMarketPrice fin-streamer
       'fin-streamer[data-field="regularMarketPrice"]',
-      // Broader - look for data-testid
       '[data-testid="qsp-price"]',
-      // Even broader - main price container
       'section[data-testid="quote-price"] fin-streamer[data-field="regularMarketPrice"]',
     ];
 
     for (const selector of priceSelectors) {
-      console.log(`[Price Extraction] Trying selector: ${selector}`);
       const elements = await page.$$(selector);
 
       if (elements.length > 0) {
-        console.log(`[Price Extraction] Found ${elements.length} elements with selector: ${selector}`);
-
         // Try each element (in case there are multiple)
         for (let i = 0; i < elements.length; i++) {
           const element = elements[i];
-
-          // Get all relevant attributes
           const valueAttr = await element?.getAttribute('value');
           const dataValue = await element?.getAttribute('data-value');
           const dataSymbol = await element?.getAttribute('data-symbol');
           const textContent = await element?.textContent();
 
-          console.log(`[Price Debug] Element ${i + 1} attributes:`, {
-            selector,
-            valueAttr,
-            dataValue,
-            dataSymbol,
-            textContent: textContent?.substring(0, 50)
-          });
-
           // If this element has a data-symbol, make sure it matches our ticker
           if (dataSymbol && dataSymbol !== ticker) {
-            console.log(`[Price Debug] Skipping element ${i + 1} - wrong symbol: ${dataSymbol} (expected ${ticker})`);
             continue;
           }
 
@@ -297,7 +278,7 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
           if (valueAttr && valueAttr !== '0' && valueAttr !== '') {
             const price = parseFloat(valueAttr);
             if (!isNaN(price) && price > 0) {
-              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from 'value' attribute (selector: ${selector})`);
+              console.log(`[Price Extraction] ✓ SUCCESS: ${price} (${selector})`);
               return price;
             }
           }
@@ -306,7 +287,7 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
           if (dataValue && dataValue !== '0' && dataValue !== '') {
             const price = parseFloat(dataValue);
             if (!isNaN(price) && price > 0) {
-              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from 'data-value' attribute (selector: ${selector})`);
+              console.log(`[Price Extraction] ✓ SUCCESS: ${price} (${selector})`);
               return price;
             }
           }
@@ -315,7 +296,7 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
           if (textContent) {
             const price = parseFormattedNumber(textContent);
             if (price !== undefined && price > 0) {
-              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from text content (selector: ${selector})`);
+              console.log(`[Price Extraction] ✓ SUCCESS: ${price} (${selector})`);
               return price;
             }
           }
@@ -325,108 +306,12 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
 
     console.warn(`[Price Extraction] All DOM selectors failed, falling back to regex...`);
 
-    // Regex fallback on whole page source - MATCH TICKER FIRST, then extract price
-    console.log('[Price Extraction] DOM extraction failed. Searching page source with regex...');
+    // Regex fallback - last resort
+    console.warn('[Price Extraction] DOM selectors failed, using smart selection fallback...');
     const content = await page.content();
-
-    // STRATEGY 0: DEBUG - Find ALL occurrences of the ticker in the JSON to understand structure
     const tickerRegexSafe = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    console.log(`[Price Debug] Searching for all occurrences of "${ticker}" in page source...`);
 
-    // Find ticker mentions with surrounding context (100 chars before and after)
-    const tickerContextRegex = new RegExp(`.{0,100}"${tickerRegexSafe}".{0,100}`, 'gi');
-    const tickerContextMatches = content.match(tickerContextRegex);
-
-    if (tickerContextMatches && tickerContextMatches.length > 0) {
-      console.log(`[Price Debug] Found ${tickerContextMatches.length} occurrences of "${ticker}". Showing first 5 with context:`);
-      tickerContextMatches.slice(0, 5).forEach((match, i) => {
-        console.log(`[Price Debug] Occurrence ${i + 1}: ...${match}...`);
-      });
-    } else {
-      console.warn(`[Price Debug] No occurrences of "${ticker}" found in page source!`);
-    }
-
-    // STRATEGY 1: Find ticker-specific price in JSON structure
-    // Yahoo embeds data like: "AAPL":{"regularMarketPrice":{"raw":230.45,"fmt":"230.45"},...}
-    // We need to match the SPECIFIC ticker to avoid grabbing prices from trending/related stocks
-
-    // Pattern: Look for ticker symbol followed by regularMarketPrice
-    // Allows for other JSON properties between ticker and price
-    const tickerPriceRegex = new RegExp(
-      `"${tickerRegexSafe}"\\s*:\\s*\\{[^}]*?"regularMarketPrice"\\s*:\\s*\\{\\s*"raw"\\s*:\\s*([0-9.]+)`,
-      'i'
-    );
-
-    const tickerMatch = tickerPriceRegex.exec(content);
-
-    if (tickerMatch && tickerMatch[1]) {
-      const price = parseFloat(tickerMatch[1]);
-      console.log(`[Price Debug] Strategy 1 matched! Raw match: "${tickerMatch[0].substring(0, 150)}..."`);
-      if (!isNaN(price) && validatePrice(price, ticker)) {
-        console.log(`[Price Extraction] ✓ SUCCESS: Extracted ticker-matched price ${price} using regex (ticker: ${ticker})`);
-        return price;
-      } else {
-        console.warn(`[Price Extraction] Found ticker-matched price ${price} but validation failed`);
-      }
-    } else {
-      console.warn(`[Price Debug] Strategy 1 FAILED - Pattern did not match`);
-    }
-
-    // STRATEGY 2: If ticker match fails, try finding symbol in quote context
-    // Pattern: "symbol":"AAPL" ... "regularMarketPrice":{"raw":123.45
-    const symbolContextRegex = new RegExp(
-      `"symbol"\\s*:\\s*"${tickerRegexSafe}"[^}]*?\\{[^}]*?"regularMarketPrice"\\s*:\\s*\\{\\s*"raw"\\s*:\\s*([0-9.]+)`,
-      'i'
-    );
-
-    const symbolMatch = symbolContextRegex.exec(content);
-
-    if (symbolMatch && symbolMatch[1]) {
-      const price = parseFloat(symbolMatch[1]);
-      console.log(`[Price Debug] Strategy 2 matched! Raw match: "${symbolMatch[0].substring(0, 150)}..."`);
-      if (!isNaN(price) && validatePrice(price, ticker)) {
-        console.log(`[Price Extraction] ✓ SUCCESS: Extracted symbol-matched price ${price} using regex (symbol: ${ticker})`);
-        return price;
-      } else {
-        console.warn(`[Price Extraction] Found symbol-matched price ${price} but validation failed`);
-      }
-    } else {
-      console.warn(`[Price Debug] Strategy 2 FAILED - Pattern did not match`);
-    }
-
-    // STRATEGY 3: Try broader search - find where ticker appears near a price
-    // Look for: "symbol":"AAPL" anywhere, then find nearest regularMarketPrice
-    console.log(`[Price Debug] Trying Strategy 3: Find symbol field, then nearest price...`);
-    const symbolFieldRegex = new RegExp(`"symbol"\\s*:\\s*"${tickerRegexSafe}"`, 'gi');
-    let symbolFieldMatch;
-    const symbolPositions: number[] = [];
-
-    while ((symbolFieldMatch = symbolFieldRegex.exec(content)) !== null) {
-      symbolPositions.push(symbolFieldMatch.index);
-      // Get 500 chars of context around this symbol mention
-      const contextStart = Math.max(0, symbolFieldMatch.index - 250);
-      const contextEnd = Math.min(content.length, symbolFieldMatch.index + 250);
-      const context = content.substring(contextStart, contextEnd);
-      console.log(`[Price Debug] Found "symbol":"${ticker}" at position ${symbolFieldMatch.index}. Context: ...${context}...`);
-
-      // Try to find regularMarketPrice near this symbol
-      const nearbyPriceRegex = /"regularMarketPrice"\s*:\s*\{\s*"raw"\s*:\s*([0-9.]+)/;
-      const nearbyMatch = context.match(nearbyPriceRegex);
-      if (nearbyMatch && nearbyMatch[1]) {
-        const price = parseFloat(nearbyMatch[1]);
-        if (!isNaN(price) && validatePrice(price, ticker)) {
-          console.log(`[Price Extraction] ✓ SUCCESS: Found price ${price} near symbol field at position ${symbolFieldMatch.index}`);
-          return price;
-        }
-      }
-    }
-
-    console.log(`[Price Debug] Found ${symbolPositions.length} "symbol":"${ticker}" occurrences, but no valid nearby prices`);
-
-    // STRATEGY 4: Last resort - collect all prices but use SMART SELECTION
-    // This is unreliable and should rarely be used
-    console.warn(`[Price Extraction] WARNING: Could not find ticker-specific price, falling back to generic price extraction (unreliable)`);
-
+    // Collect all prices from JSON
     const priceRegex = /"regularMarketPrice":\s*\{\s*"raw"\s*:\s*([0-9.]+)/g;
     const allMatches: number[] = [];
     let match;
@@ -435,54 +320,29 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
       const price = parseFloat(match[1] || '0');
       if (!isNaN(price) && price > 0) {
         allMatches.push(price);
-        console.log(`[Price Debug] Found regularMarketPrice in JSON: ${price}`);
       }
     }
 
-    console.log(`[Price Extraction] Found ${allMatches.length} price values in page source`);
-
     if (allMatches.length > 0) {
-      // Filter out invalid prices using validation
       const validPrices = allMatches.filter(p => validatePrice(p, ticker));
 
       if (validPrices.length > 0) {
-        // SMART SELECTION: For US stocks (no suffix), prefer prices in typical stock range
         let selectedPrice: number;
-
-        const isUSStock = !ticker.includes('.'); // US tickers usually don't have exchange suffix
+        const isUSStock = !ticker.includes('.');
 
         if (isUSStock) {
-          // For US stocks, prefer prices in reasonable range ($1-$1000)
           const reasonablePrices = validPrices.filter(p => p >= 1 && p <= 1000);
-
-          if (reasonablePrices.length > 0) {
-            // Pick the LAST one in reasonable range (main quote usually appears later in HTML)
-            selectedPrice = reasonablePrices[reasonablePrices.length - 1];
-            console.log(`[Price Extraction] 🎯 SMART SELECT: Found ${reasonablePrices.length} prices in reasonable US stock range ($1-$1000)`);
-            console.log(`[Price Extraction] 🎯 Selected price ${selectedPrice} (last in range) instead of first price ${validPrices[0]}`);
-          } else {
-            // No reasonable prices found, fall back to first valid
-            selectedPrice = validPrices[0];
-            console.warn(`[Price Extraction] ⚠️ No prices in reasonable range ($1-$1000), using first valid: ${selectedPrice}`);
-          }
+          selectedPrice = reasonablePrices.length > 0
+            ? reasonablePrices[reasonablePrices.length - 1]
+            : validPrices[0];
         } else {
-          // For non-US stocks, use first valid price
           selectedPrice = validPrices[0];
-          console.log(`[Price Extraction] Using first valid price for non-US stock: ${selectedPrice}`);
         }
 
-        if (selectedPrice === undefined) {
-          throw new Error('Failed to extract valid price after filtering');
-        }
-
-        console.log(`[Price Extraction] ✓ FALLBACK SUCCESS: Selected price ${selectedPrice} (of ${validPrices.length} valid matches)`);
-        if (validPrices.length > 1) {
-          console.log(`[Price Debug] Other valid prices found: ${validPrices.filter(p => p !== selectedPrice).join(', ')}`);
-        }
+        console.log(`[Price Extraction] ✓ SMART SELECT: ${selectedPrice} (${validPrices.length} candidates)`);
         return selectedPrice;
       } else {
-        console.error(`[Price Extraction] ✗ FAIL: Found ${allMatches.length} prices but none passed validation: ${allMatches.join(', ')}`);
-        throw new Error(`Price validation failed - found suspicious values: ${allMatches.join(', ')}`);
+        throw new Error(`Price validation failed - no valid prices found`);
       }
     }
 
@@ -544,8 +404,11 @@ async function extractRatios(page: Page): Promise<FinancialRatios> {
   const ratios: FinancialRatios = {};
 
   try {
-    // Extract all table rows
+    console.log('[Ratios] Extracting key statistics...');
     const rows = await page.$$('tr');
+    console.log(`[Ratios] Found ${rows.length} table rows`);
+
+    let extractedCount = 0;
 
     for (const row of rows) {
       const cells = await row.$$('td');
@@ -566,45 +429,80 @@ async function extractRatios(page: Page): Promise<FinancialRatios> {
         // Map labels to ratio keys
         if (labelLower.includes('trailing p/e') || labelLower === 'pe ratio (ttm)') {
           ratios.PE = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ PE: ${value} (${label})`);
         } else if (labelLower.includes('price/book') || labelLower.includes('p/b')) {
           ratios.PB = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ PB: ${value} (${label})`);
         } else if (labelLower.includes('peg ratio')) {
           ratios.PEG = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ PEG: ${value} (${label})`);
         } else if (labelLower.includes('price/sales') || labelLower.includes('p/s')) {
           ratios.PS = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ PS: ${value} (${label})`);
         } else if (labelLower.includes('return on equity') || labelLower === 'roe') {
           ratios.ROE = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ ROE: ${value} (${label})`);
         } else if (labelLower.includes('return on assets') || labelLower === 'roa') {
           ratios.ROA = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ ROA: ${value} (${label})`);
         } else if (labelLower.includes('profit margin') || labelLower.includes('net margin')) {
           ratios.NetMargin = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ NetMargin: ${value} (${label})`);
         } else if (labelLower.includes('operating margin')) {
           ratios.OperatingMargin = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ OperatingMargin: ${value} (${label})`);
         } else if (labelLower.includes('total debt/equity') || labelLower.includes('debt to equity')) {
           ratios.DebtToEquity = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ DebtToEquity: ${value} (${label})`);
         } else if (labelLower.includes('current ratio')) {
           ratios.CurrentRatio = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ CurrentRatio: ${value} (${label})`);
         } else if (labelLower.includes('quick ratio')) {
           ratios.QuickRatio = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ QuickRatio: ${value} (${label})`);
         } else if (
           labelLower.includes('forward annual dividend yield') ||
           labelLower.includes('dividend yield')
         ) {
           ratios.DividendYield = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ DividendYield: ${value} (${label})`);
         } else if (labelLower.includes('payout ratio')) {
           ratios.PayoutRatio = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ PayoutRatio: ${value} (${label})`);
         } else if (labelLower.includes('revenue growth') || labelLower.includes('quarterly revenue growth')) {
           ratios.RevenueGrowth = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ RevenueGrowth: ${value} (${label})`);
         } else if (labelLower.includes('earnings growth') || labelLower.includes('quarterly earnings growth')) {
           ratios.EPSGrowth = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ EPSGrowth: ${value} (${label})`);
         } else if (labelLower.includes('market cap')) {
           ratios.MarketCap = parseMarketCap(valueText);
+          extractedCount++;
+          console.log(`[Ratios] ✓ MarketCap: ${ratios.MarketCap} (${label})`);
         } else if (labelLower.includes('beta')) {
           ratios.Beta = value;
+          extractedCount++;
+          console.log(`[Ratios] ✓ Beta: ${value} (${label})`);
         }
       }
     }
 
+    console.log(`[Ratios] ✓ Extracted ${extractedCount} key statistics`);
     return ratios;
   } catch (error) {
     console.warn('Failed to extract some ratios:', error);
@@ -653,15 +551,15 @@ function parseMarketCap(text: string): number | undefined {
 async function extractFinancialData(page: Page, ticker: string, tab: string, labelMap: Record<string, keyof FinancialRatios>): Promise<Partial<FinancialRatios>> {
   const data: Partial<FinancialRatios> = {};
   try {
+    console.log(`[Financials] Fetching ${tab} for ${ticker}...`);
     const url = `https://finance.yahoo.com/quote/${ticker}/${tab}`;
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    try {
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
-    } catch { }
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => { });
 
-    // Yahoo Finance Financials Table Selectors
-    // They use div structures now mostly
     const rows = await page.$$('.tableBody .row, div[data-test="fin-row"], tr');
+    console.log(`[Financials] Found ${rows.length} rows in ${tab}`);
+
+    let extractedCount = 0;
 
     for (const row of rows) {
       const labelEl = await row.$('.rowTitle, div[class*="title"], td:first-child');
@@ -673,15 +571,19 @@ async function extractFinancialData(page: Page, ticker: string, tab: string, lab
 
         if (labelText && valueText && labelMap[labelText]) {
           const key = labelMap[labelText];
-          const value = parseMarketCap(valueText); // Reuse parseMarketCap as it handles K, M, B, T
+          const value = parseMarketCap(valueText);
           if (value !== undefined) {
             data[key] = value;
+            extractedCount++;
+            console.log(`[Financials] ✓ ${key}: ${value} (${labelText})`);
           }
         }
       }
     }
+
+    console.log(`[Financials] ✓ Extracted ${extractedCount} items from ${tab}`);
   } catch (e) {
-    console.warn(`Failed to extract ${tab} for ${ticker}:`, e);
+    console.warn(`[Financials] ✗ Failed to extract ${tab}:`, e);
   }
   return data;
 }
