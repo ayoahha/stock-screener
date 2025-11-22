@@ -17,6 +17,13 @@ export * from './providers/fallback';
 export * from './resolver/ticker-resolver';
 export * from './cache/cache-manager';
 
+// AI providers and cost management (SERVER-SIDE ONLY)
+// These should only be imported in server-side code (API routes, server components)
+export * from './providers/ai-provider';
+export * from './cost/budget-manager';
+export * from './cost/rate-limiter';
+export * from './validation/ai-validator';
+
 // Types principaux
 export interface StockData {
   ticker: string;
