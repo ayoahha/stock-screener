@@ -11,7 +11,7 @@
  * - Fallback between models
  */
 
-import type { StockData, FinancialRatios } from '../index';
+import type { StockData } from '../index';
 import { KimiClient, type KimiResponse } from './kimi-client';
 import { DeepSeekClient, type DeepSeekResponse } from './deepseek-client';
 
@@ -32,7 +32,7 @@ export interface AIStockData extends StockData {
  */
 export class AIProvider {
   private kimiClient?: KimiClient;
-  private deepseekClient?: DeepSeekClient;
+  private deepseekClient: DeepSeekClient;
   private config: AIProviderConfig;
 
   constructor(config: AIProviderConfig) {

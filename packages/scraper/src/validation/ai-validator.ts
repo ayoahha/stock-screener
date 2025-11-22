@@ -67,7 +67,7 @@ export function validateAIData(data: AIStockData, ticker: string): ValidationRes
 /**
  * Level 1: Range Validation
  */
-function validateRanges(data: AIStockData, ticker: string): {
+function validateRanges(data: AIStockData, _ticker: string): {
   warnings: string[];
   errors: string[];
   ratiosWithIssues: string[];

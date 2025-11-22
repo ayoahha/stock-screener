@@ -6,6 +6,8 @@ import { ScoreGauge } from '@/components/score-gauge';
 import { RatioBreakdown } from '@/components/ratio-breakdown';
 import { TabNavigation } from '@/components/tab-navigation';
 import { Card } from '@/components/ui/card';
+import { DataSourceBadge } from '@/components/data-source-badge';
+import { AIInsightsButton } from '@/components/ai-insights-button';
 import { trpc } from '@/lib/trpc/client';
 import { Loader2, AlertCircle, Search, History } from 'lucide-react';
 
@@ -34,6 +36,16 @@ export default function DashboardPage() {
     {
       ratios: (stockData?.ratios ?? {}) as Record<string, number | undefined>,
       profileType: selectedProfile,
+    },
+    { enabled: !!stockData }
+  );
+
+  // Get stock classification for AI analysis
+  const {
+    data: classification,
+  } = trpc.scoring.classify.useQuery(
+    {
+      ratios: (stockData?.ratios ?? {}) as Record<string, number | undefined>,
     },
     { enabled: !!stockData }
   );
@@ -119,8 +131,11 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Source</p>
-                <p className="text-xl font-semibold uppercase">{stockData.source}</p>
+                <p className="text-sm text-gray-500 mb-2">Source</p>
+                <DataSourceBadge
+                  source={stockData.source}
+                  confidence={stockData.confidence}
+                />
               </div>
             </div>
           </Card>
@@ -163,6 +178,23 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      {/* AI Insights Section */}
+      {stockData && scoringResult && classification && (
+        <div className="mt-8">
+          <Card className="p-8">
+            <h2 className="text-2xl font-semibold mb-6">Analyse IA Qualitative</h2>
+            <AIInsightsButton
+              ticker={stockData.ticker}
+              name={stockData.name}
+              ratios={stockData.ratios as Record<string, number | null>}
+              stockType={classification.stockType}
+              score={scoringResult.score}
+              verdict={scoringResult.verdict}
+            />
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

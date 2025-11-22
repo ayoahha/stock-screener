@@ -74,10 +74,10 @@ export class BudgetManager {
 
     try {
       // Get current month spend
-      const { data: monthData } = await supabase
+      const { data: monthData } = await (supabase
         .from('ai_current_month_spend')
         .select('*')
-        .single();
+        .single() as any);
 
       const currentMonthSpend = parseFloat(monthData?.total_cost || '0');
 
@@ -162,7 +162,7 @@ export class BudgetManager {
     const supabase = createServerClient();
 
     try {
-      await supabase.from('ai_usage_log').insert({
+      await (supabase.from('ai_usage_log') as any).insert({
         ticker: data.ticker,
         purpose: data.purpose,
         model: data.model,
@@ -200,10 +200,10 @@ export class BudgetManager {
     const supabase = createServerClient();
 
     try {
-      const { data } = await supabase
+      const { data } = await (supabase
         .from('ai_current_month_spend')
         .select('*')
-        .single();
+        .single() as any);
 
       return {
         totalCost: parseFloat(data?.total_cost || '0'),
@@ -239,17 +239,17 @@ export class BudgetManager {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      const { data } = await supabase
+      const { data } = await (supabase
         .from('ai_usage_log')
         .select('cost_usd')
         .gte('created_at', today + 'T00:00:00.000Z')
-        .lt('created_at', today + 'T23:59:59.999Z');
+        .lt('created_at', today + 'T23:59:59.999Z') as any);
 
       if (!data || data.length === 0) {
         return 0;
       }
 
-      return data.reduce((sum, row) => sum + parseFloat(row.cost_usd), 0);
+      return data.reduce((sum: number, row: any) => sum + parseFloat(row.cost_usd), 0);
     } catch (error) {
       console.error('[BudgetManager] Error getting today spend:', error);
       return 0;

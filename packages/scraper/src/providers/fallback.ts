@@ -25,7 +25,7 @@ import type { StockData } from '../index';
 import { fetchFromYahooQueryAPI } from './yahoo-query-api';
 import { scrapeYahooFinance } from './yahoo-finance';
 import { fetchFromFMP } from './fmp';
-import { AIProvider, type AIStockData } from './ai-provider';
+import { AIProvider } from './ai-provider';
 import { validateAIData } from '../validation/ai-validator';
 import { BudgetManager } from '../cost/budget-manager';
 import { RateLimiter } from '../cost/rate-limiter';
@@ -136,9 +136,9 @@ export async function fetchWithFallback(ticker: string): Promise<StockData> {
   // Strategy 3: AI (Kimi-K2 / DeepSeek) - NEW
   // Intelligent fallback with strict validation (confidence >= 80%)
   if (ENABLE_AI_FALLBACK && initializeAI()) {
+    const startTime = Date.now();
     try {
       console.log(`[Fallback] Attempting AI provider for ${ticker}...`);
-      const startTime = Date.now();
 
       // Check budget and rate limits
       const budgetCheck = await budgetManager!.canMakeRequest('data_fetch');
