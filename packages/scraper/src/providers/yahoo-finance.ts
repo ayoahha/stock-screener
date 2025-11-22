@@ -705,6 +705,10 @@ function calculateAllRatios(ratios: FinancialRatios): FinancialRatios {
     r.QuickRatio = div(r.TotalCurrentAssets - r.Inventory, r.TotalCurrentLiabilities);
   } else if (!r.QuickRatio && r.CashAndEquivalents && r.AccountsReceivable && r.TotalCurrentLiabilities) {
     r.QuickRatio = div(r.CashAndEquivalents + r.AccountsReceivable, r.TotalCurrentLiabilities);
+  } else if (!r.QuickRatio && r.CurrentRatio) {
+    // Fallback: Use Current Ratio (Ratio liquidité générale) when detailed breakdown not available
+    // This is common when scraping Yahoo Finance which doesn't provide detailed current assets/liabilities
+    r.QuickRatio = r.CurrentRatio;
   }
 
   // Cash Ratio = Cash / Current Liabilities
