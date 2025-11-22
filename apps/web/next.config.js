@@ -13,22 +13,23 @@ const nextConfig = {
 
   // Exclude Playwright and other server-only packages from client bundle
   // Note: serverExternalPackages is the correct option for Next.js 15+
-  serverExternalPackages: ['playwright', 'playwright-core'],
+  serverExternalPackages: ['playwright', 'playwright-core', 'openai'],
 
   // Webpack configuration to exclude Playwright from bundle
   webpack: (config, { isServer }) => {
-    // Externalize Playwright for both client and server builds
+    // Externalize Playwright and OpenAI for both client and server builds
     config.externals = config.externals || [];
     if (Array.isArray(config.externals)) {
-      config.externals.push('playwright', 'playwright-core');
+      config.externals.push('playwright', 'playwright-core', 'openai');
     }
 
-    // For client builds, alias Playwright to false to prevent bundling attempts
+    // For client builds, alias Playwright and OpenAI to false to prevent bundling attempts
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,
         playwright: false,
         'playwright-core': false,
+        openai: false,
       };
     }
 
