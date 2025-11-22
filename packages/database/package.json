@@ -11,15 +11,15 @@
     "clean": "rm -rf dist .turbo node_modules"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.3",
-    "zod": "^3.22.4"
+    "@supabase/supabase-js": "^2.45.4",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@stock-screener/typescript-config": "workspace:*",
-    "@types/node": "^20.11.0",
-    "dotenv": "^16.4.1",
-    "supabase": "^1.142.2",
-    "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "@types/node": "^22.10.0",
+    "dotenv": "^16.6.1",
+    "supabase": "^1.226.4",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }
