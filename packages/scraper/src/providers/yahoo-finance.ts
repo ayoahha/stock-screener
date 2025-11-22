@@ -249,99 +249,81 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
   try {
     console.log(`[Price Extraction] Starting extraction for ${ticker}`);
 
-    // Use THE MOST SPECIFIC selector to get the primary price element
-    // This is the main price displayed at the top of the page
-    const primarySelector = 'fin-streamer[data-field="regularMarketPrice"][data-test="qsp-price"]';
-    const element = await page.$(primarySelector);
+    // STRATEGY 1: Try multiple specific selectors for the live price element
+    // Yahoo Finance uses fin-streamer elements with data-symbol attribute
+    const priceSelectors = [
+      // Most specific - main quote price with data-symbol
+      `fin-streamer[data-symbol="${ticker}"][data-field="regularMarketPrice"]`,
+      // Fallback - any regularMarketPrice fin-streamer
+      'fin-streamer[data-field="regularMarketPrice"]',
+      // Broader - look for data-testid
+      '[data-testid="qsp-price"]',
+      // Even broader - main price container
+      'section[data-testid="quote-price"] fin-streamer[data-field="regularMarketPrice"]',
+    ];
 
-    if (element) {
-      console.log(`[Price Extraction] Found primary price element with selector: ${primarySelector}`);
+    for (const selector of priceSelectors) {
+      console.log(`[Price Extraction] Trying selector: ${selector}`);
+      const elements = await page.$$(selector);
 
-      // Extract all attributes for debugging
-      const valueAttr = await element.getAttribute('value');
-      const dataValue = await element.getAttribute('data-value');
-      const dataSymbol = await element.getAttribute('data-symbol');
-      const textContent = await element.textContent();
+      if (elements.length > 0) {
+        console.log(`[Price Extraction] Found ${elements.length} elements with selector: ${selector}`);
 
-      console.log(`[Price Debug] Element attributes:`, {
-        ticker,
-        selector: primarySelector,
-        valueAttr,
-        dataValue,
-        dataSymbol,
-        textContent: textContent?.substring(0, 50)
-      });
+        // Try each element (in case there are multiple)
+        for (let i = 0; i < elements.length; i++) {
+          const element = elements[i];
 
-      // PRIORITY 1: 'value' attribute (most frequently updated by Yahoo's JavaScript)
-      // Based on logs, this attribute contains the correct live price
-      if (valueAttr && valueAttr !== '0' && valueAttr !== '') {
-        const price = parseFloat(valueAttr);
-        if (!isNaN(price) && validatePrice(price, ticker)) {
-          console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from 'value' attribute`);
-          return price;
-        } else {
-          console.warn(`[Price Extraction] 'value' attribute exists but validation failed: ${price}`);
-        }
-      }
+          // Get all relevant attributes
+          const valueAttr = await element?.getAttribute('value');
+          const dataValue = await element?.getAttribute('data-value');
+          const dataSymbol = await element?.getAttribute('data-symbol');
+          const textContent = await element?.textContent();
 
-      // PRIORITY 2: 'data-value' attribute (may contain cached/stale data)
-      if (dataValue && dataValue !== '0' && dataValue !== '') {
-        const price = parseFloat(dataValue);
-        if (!isNaN(price) && validatePrice(price, ticker)) {
-          console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from 'data-value' attribute`);
-          return price;
-        } else {
-          console.warn(`[Price Extraction] 'data-value' attribute exists but validation failed: ${price}`);
-        }
-      }
+          console.log(`[Price Debug] Element ${i + 1} attributes:`, {
+            selector,
+            valueAttr,
+            dataValue,
+            dataSymbol,
+            textContent: textContent?.substring(0, 50)
+          });
 
-      // PRIORITY 3: textContent as fallback (less reliable due to formatting)
-      if (textContent) {
-        const price = parseFormattedNumber(textContent);
-        if (price !== undefined && validatePrice(price, ticker)) {
-          console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from textContent`);
-          return price;
-        } else {
-          console.warn(`[Price Extraction] textContent exists but validation failed: ${price}`);
-        }
-      }
-    } else {
-      console.warn(`[Price Extraction] Primary price element NOT found with selector: ${primarySelector}`);
+          // If this element has a data-symbol, make sure it matches our ticker
+          if (dataSymbol && dataSymbol !== ticker) {
+            console.log(`[Price Debug] Skipping element ${i + 1} - wrong symbol: ${dataSymbol} (expected ${ticker})`);
+            continue;
+          }
 
-      // Fallback: try less specific selectors
-      const fallbackSelectors = [
-        'fin-streamer[data-field="regularMarketPrice"]',
-        '[data-test="qsp-price"]',
-        '.livePrice'
-      ];
-
-      for (const selector of fallbackSelectors) {
-        console.log(`[Price Extraction] Trying fallback selector: ${selector}`);
-        const fallbackElement = await page.$(selector);
-
-        if (fallbackElement) {
-          const valueAttr = await fallbackElement.getAttribute('value');
-          const dataValue = await fallbackElement.getAttribute('data-value');
-
-          // Try value first, then data-value
-          if (valueAttr) {
+          // Try value attribute first (most reliable for live data)
+          if (valueAttr && valueAttr !== '0' && valueAttr !== '') {
             const price = parseFloat(valueAttr);
-            if (!isNaN(price) && validatePrice(price, ticker)) {
-              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from fallback selector '${selector}' (value attr)`);
+            if (!isNaN(price) && price > 0) {
+              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from 'value' attribute (selector: ${selector})`);
               return price;
             }
           }
 
-          if (dataValue) {
+          // Try data-value attribute
+          if (dataValue && dataValue !== '0' && dataValue !== '') {
             const price = parseFloat(dataValue);
-            if (!isNaN(price) && validatePrice(price, ticker)) {
-              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from fallback selector '${selector}' (data-value attr)`);
+            if (!isNaN(price) && price > 0) {
+              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from 'data-value' attribute (selector: ${selector})`);
+              return price;
+            }
+          }
+
+          // Try text content as last resort
+          if (textContent) {
+            const price = parseFormattedNumber(textContent);
+            if (price !== undefined && price > 0) {
+              console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} from text content (selector: ${selector})`);
               return price;
             }
           }
         }
       }
     }
+
+    console.warn(`[Price Extraction] All DOM selectors failed, falling back to regex...`);
 
     // Regex fallback on whole page source - MATCH TICKER FIRST, then extract price
     console.log('[Price Extraction] DOM extraction failed. Searching page source with regex...');
