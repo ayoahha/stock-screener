@@ -51,8 +51,9 @@ export class DeepSeekClient {
     });
 
     // DeepSeek model configuration
-    // OpenRouter model name: "deepseek/deepseek-reasoner"
-    this.model = config.model || 'deepseek/deepseek-reasoner';
+    // OpenRouter model name: "deepseek/deepseek-chat" (default)
+    // Can be overridden via config.model parameter
+    this.model = config.model || 'deepseek/deepseek-chat';
     this.temperature = config.temperature ?? 0.1; // Low temperature for factual data
     this.maxTokens = config.maxTokens ?? 1500;
   }

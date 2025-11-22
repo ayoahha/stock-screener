@@ -50,9 +50,10 @@ export class KimiClient {
     });
 
     // Kimi model configuration
-    // Note: Check OpenRouter docs for exact model name
-    // Possible names: "moonshot/kimi-k2", "kimi/kimi-k2", or similar
-    this.model = config.model || 'deepseek/deepseek-chat'; // Fallback to DeepSeek if Kimi not available
+    // OpenRouter model name: "moonshot/kimi-k2-thinking" (common)
+    // Can be overridden via config.model parameter
+    // Check https://openrouter.ai/models for available Kimi models
+    this.model = config.model || 'moonshot/kimi-k2-thinking';
     this.temperature = config.temperature ?? 0.1; // Low temperature for factual data
     this.maxTokens = config.maxTokens ?? 1500;
   }

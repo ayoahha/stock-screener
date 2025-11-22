@@ -19,6 +19,8 @@ export interface AIProviderConfig {
   apiKey: string;
   primaryModel: 'kimi' | 'deepseek';
   fallbackModel?: 'kimi' | 'deepseek';
+  kimiModelId?: string;
+  deepseekModelId?: string;
 }
 
 export interface AIStockData extends StockData {
@@ -42,6 +44,7 @@ export class AIProvider {
     try {
       this.kimiClient = new KimiClient({
         apiKey: config.apiKey,
+        model: config.kimiModelId, // Use custom model ID if provided
         temperature: 0.1,
         maxTokens: 1500
       });
@@ -51,6 +54,7 @@ export class AIProvider {
 
     this.deepseekClient = new DeepSeekClient({
       apiKey: config.apiKey,
+      model: config.deepseekModelId, // Use custom model ID if provided
       temperature: 0.1,
       maxTokens: 1500
     });
