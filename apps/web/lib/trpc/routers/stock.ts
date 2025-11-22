@@ -19,7 +19,7 @@ import { createServerClient } from '@stock-screener/database';
 export const stockRouter = router({
   /**
    * Fetch stock data
-   * Input: ticker (ex: "CAP.PA", "AAPL")
+   * Input: ticker (ex: "CAP.PA", "AAPL"), forceRefresh (optional, bypasses cache)
    * Output: StockData complet avec ratios
    *
    * Auto-save: Automatically saves/updates stock in history
@@ -28,12 +28,13 @@ export const stockRouter = router({
     .input(
       z.object({
         ticker: z.string().min(1).max(20),
+        forceRefresh: z.boolean().optional().default(false),
       })
     )
     .query(async ({ input }) => {
       try {
         // 1. Fetch real stock data using scraper (Yahoo Finance → FMP fallback)
-        const stockData = await fetchStockData(input.ticker);
+        const stockData = await fetchStockData(input.ticker, input.forceRefresh);
 
         // 2. Classify stock type (value, growth, dividend)
         const stockType = classifyStock(stockData.ratios as Record<string, number | undefined>);
@@ -99,17 +100,18 @@ export const stockRouter = router({
 
   /**
    * Search multiple tickers at once
-   * Input: tickers (ex: ["AAPL", "CAP.PA", "AIR.PA"])
+   * Input: tickers (ex: ["AAPL", "CAP.PA", "AIR.PA"]), forceRefresh (optional)
    * Output: Array<StockData>
    */
   search: publicProcedure
     .input(
       z.object({
         tickers: z.array(z.string()).min(1).max(10),
+        forceRefresh: z.boolean().optional().default(false),
       })
     )
     .query(async ({ input }) => {
       // Batch fetch multiple tickers in parallel
-      return await Promise.all(input.tickers.map((t) => fetchStockData(t)));
+      return await Promise.all(input.tickers.map((t) => fetchStockData(t, input.forceRefresh)));
     }),
 });

@@ -131,12 +131,16 @@ import { getCachedStockData, setCachedStockData } from './cache/cache-manager';
  * Fetch stock data with intelligent fallback
  * Uses cache if available, then tries: Yahoo → FMP → Error
  */
-export async function fetchStockData(ticker: string): Promise<StockData> {
-  // Check cache first
-  const cached = await getCachedStockData(ticker);
-  if (cached) {
-    console.log(`[fetchStockData] Cache hit for ${ticker}`);
-    return cached;
+export async function fetchStockData(ticker: string, forceRefresh = false): Promise<StockData> {
+  // Check cache first (unless force refresh is requested)
+  if (!forceRefresh) {
+    const cached = await getCachedStockData(ticker);
+    if (cached) {
+      console.log(`[fetchStockData] Cache hit for ${ticker}`);
+      return cached;
+    }
+  } else {
+    console.log(`[fetchStockData] Force refresh requested for ${ticker}, bypassing cache`);
   }
 
   // Fetch with fallback
