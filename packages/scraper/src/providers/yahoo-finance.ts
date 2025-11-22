@@ -560,6 +560,7 @@ async function extractFinancialData(page: Page, ticker: string, tab: string, lab
     console.log(`[Financials] Found ${rows.length} rows in ${tab}`);
 
     let extractedCount = 0;
+    const allLabels: string[] = [];
 
     for (const row of rows) {
       const labelEl = await row.$('.rowTitle, div[class*="title"], td:first-child');
@@ -569,17 +570,23 @@ async function extractFinancialData(page: Page, ticker: string, tab: string, lab
         const labelText = (await labelEl.textContent())?.trim();
         const valueText = (await valueEl.textContent())?.trim();
 
-        if (labelText && valueText && labelMap[labelText]) {
-          const key = labelMap[labelText];
-          const value = parseMarketCap(valueText);
-          if (value !== undefined) {
-            data[key] = value;
-            extractedCount++;
-            console.log(`[Financials] ✓ ${key}: ${value} (${labelText})`);
+        if (labelText && valueText) {
+          allLabels.push(labelText);
+
+          if (labelMap[labelText]) {
+            const key = labelMap[labelText];
+            const value = parseMarketCap(valueText);
+            if (value !== undefined) {
+              data[key] = value;
+              extractedCount++;
+              console.log(`[Financials] ✓ ${key}: ${value} (${labelText})`);
+            }
           }
         }
       }
     }
+
+    console.log(`[Financials] All labels found in ${tab}:`, allLabels);
 
     console.log(`[Financials] ✓ Extracted ${extractedCount} items from ${tab}`);
   } catch (e) {
