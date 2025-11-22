@@ -441,7 +441,7 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
 
     console.log(`[Price Debug] Found ${symbolPositions.length} "symbol":"${ticker}" occurrences, but no valid nearby prices`);
 
-    // STRATEGY 4: Last resort - collect all prices but LOG WARNING
+    // STRATEGY 4: Last resort - collect all prices but use SMART SELECTION
     // This is unreliable and should rarely be used
     console.warn(`[Price Extraction] WARNING: Could not find ticker-specific price, falling back to generic price extraction (unreliable)`);
 
@@ -459,21 +459,45 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
 
     console.log(`[Price Extraction] Found ${allMatches.length} price values in page source`);
 
-    // If we found prices, use the FIRST VALID one (most likely to be current/live)
     if (allMatches.length > 0) {
       // Filter out invalid prices using validation
       const validPrices = allMatches.filter(p => validatePrice(p, ticker));
 
       if (validPrices.length > 0) {
-        const price = validPrices[0];
-        if (price === undefined) {
+        // SMART SELECTION: For US stocks (no suffix), prefer prices in typical stock range
+        let selectedPrice: number;
+
+        const isUSStock = !ticker.includes('.'); // US tickers usually don't have exchange suffix
+
+        if (isUSStock) {
+          // For US stocks, prefer prices in reasonable range ($1-$1000)
+          const reasonablePrices = validPrices.filter(p => p >= 1 && p <= 1000);
+
+          if (reasonablePrices.length > 0) {
+            // Pick the LAST one in reasonable range (main quote usually appears later in HTML)
+            selectedPrice = reasonablePrices[reasonablePrices.length - 1];
+            console.log(`[Price Extraction] 🎯 SMART SELECT: Found ${reasonablePrices.length} prices in reasonable US stock range ($1-$1000)`);
+            console.log(`[Price Extraction] 🎯 Selected price ${selectedPrice} (last in range) instead of first price ${validPrices[0]}`);
+          } else {
+            // No reasonable prices found, fall back to first valid
+            selectedPrice = validPrices[0];
+            console.warn(`[Price Extraction] ⚠️ No prices in reasonable range ($1-$1000), using first valid: ${selectedPrice}`);
+          }
+        } else {
+          // For non-US stocks, use first valid price
+          selectedPrice = validPrices[0];
+          console.log(`[Price Extraction] Using first valid price for non-US stock: ${selectedPrice}`);
+        }
+
+        if (selectedPrice === undefined) {
           throw new Error('Failed to extract valid price after filtering');
         }
-        console.warn(`[Price Extraction] ⚠ FALLBACK: Using first valid price ${price} (of ${validPrices.length} matches) - may be inaccurate!`);
+
+        console.log(`[Price Extraction] ✓ FALLBACK SUCCESS: Selected price ${selectedPrice} (of ${validPrices.length} valid matches)`);
         if (validPrices.length > 1) {
-          console.log(`[Price Debug] Other valid prices found (discarded): ${validPrices.slice(1).join(', ')}`);
+          console.log(`[Price Debug] Other valid prices found: ${validPrices.filter(p => p !== selectedPrice).join(', ')}`);
         }
-        return price;
+        return selectedPrice;
       } else {
         console.error(`[Price Extraction] ✗ FAIL: Found ${allMatches.length} prices but none passed validation: ${allMatches.join(', ')}`);
         throw new Error(`Price validation failed - found suspicious values: ${allMatches.join(', ')}`);
