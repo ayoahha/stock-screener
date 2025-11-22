@@ -12,6 +12,7 @@ import { router, publicProcedure } from '../server';
 import {
   calculateScore,
   defaultProfiles,
+  classifyStock,
   type RatioConfig,
 } from '@stock-screener/scoring';
 
@@ -91,5 +92,19 @@ export const scoringRouter = router({
           thresholds: r.thresholds,
         })),
       };
+    }),
+
+  /**
+   * Classify stock type based on ratios
+   */
+  classify: publicProcedure
+    .input(
+      z.object({
+        ratios: z.record(z.number().optional()),
+      })
+    )
+    .query(async ({ input }) => {
+      const stockType = classifyStock(input.ratios);
+      return { stockType };
     }),
 });

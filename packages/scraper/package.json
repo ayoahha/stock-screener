@@ -12,17 +12,18 @@
   },
   "dependencies": {
     "@stock-screener/database": "workspace:*",
-    "cheerio": "^1.0.0-rc.12",
-    "playwright": "^1.41.1",
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "openai": "^4.77.3",
+    "playwright": "^1.49.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "axios": "^1.6.5",
-    "zod": "^3.22.4"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@stock-screener/typescript-config": "workspace:*",
-    "@types/node": "^20.11.0",
-    "typescript": "^5.3.3",
-    "vitest": "^1.2.1"
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
   }
 }

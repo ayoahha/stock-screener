@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TabNavigation } from '@/components/tab-navigation';
 import { StockTypeBadge, type StockType } from '@/components/stock-type-badge';
+import { DataSourceBadge, type DataSource } from '@/components/data-source-badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -234,6 +235,9 @@ export default function HistoriquePage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Type
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Source
+                  </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('lastFetched')}
@@ -251,7 +255,7 @@ export default function HistoriquePage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {historyData.items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                       Aucune action dans l'historique.
                       <br />
                       Recherchez une action pour commencer.
@@ -296,6 +300,16 @@ export default function HistoriquePage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <StockTypeBadge type={stock.stock_type} />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {stock.source ? (
+                          <DataSourceBadge
+                            source={stock.source as DataSource}
+                            confidence={(stock as any).confidence || undefined}
+                          />
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDistance(new Date(stock.last_fetched_at), new Date(), {
