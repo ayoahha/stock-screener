@@ -343,11 +343,59 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
       }
     }
 
-    // Regex fallback on whole page source - extract ALL occurrences
+    // Regex fallback on whole page source - MATCH TICKER FIRST, then extract price
     console.log('[Price Extraction] DOM extraction failed. Searching page source with regex...');
     const content = await page.content();
 
-    // Look for ALL "regularMarketPrice":{"raw":123.45,"fmt":"123.45"} occurrences
+    // STRATEGY 1: Find ticker-specific price in JSON structure
+    // Yahoo embeds data like: "AAPL":{"regularMarketPrice":{"raw":230.45,"fmt":"230.45"},...}
+    // We need to match the SPECIFIC ticker to avoid grabbing prices from trending/related stocks
+
+    // Clean ticker for regex (escape special characters like ^, .)
+    const tickerRegexSafe = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Pattern: Look for ticker symbol followed by regularMarketPrice
+    // Allows for other JSON properties between ticker and price
+    const tickerPriceRegex = new RegExp(
+      `"${tickerRegexSafe}"\\s*:\\s*\\{[^}]*?"regularMarketPrice"\\s*:\\s*\\{\\s*"raw"\\s*:\\s*([0-9.]+)`,
+      'i'
+    );
+
+    const tickerMatch = tickerPriceRegex.exec(content);
+
+    if (tickerMatch && tickerMatch[1]) {
+      const price = parseFloat(tickerMatch[1]);
+      if (!isNaN(price) && validatePrice(price, ticker)) {
+        console.log(`[Price Extraction] ✓ SUCCESS: Extracted ticker-matched price ${price} using regex (ticker: ${ticker})`);
+        return price;
+      } else {
+        console.warn(`[Price Extraction] Found ticker-matched price ${price} but validation failed`);
+      }
+    }
+
+    // STRATEGY 2: If ticker match fails, try finding symbol in quote context
+    // Pattern: "symbol":"AAPL" ... "regularMarketPrice":{"raw":123.45
+    const symbolContextRegex = new RegExp(
+      `"symbol"\\s*:\\s*"${tickerRegexSafe}"[^}]*?\\{[^}]*?"regularMarketPrice"\\s*:\\s*\\{\\s*"raw"\\s*:\\s*([0-9.]+)`,
+      'i'
+    );
+
+    const symbolMatch = symbolContextRegex.exec(content);
+
+    if (symbolMatch && symbolMatch[1]) {
+      const price = parseFloat(symbolMatch[1]);
+      if (!isNaN(price) && validatePrice(price, ticker)) {
+        console.log(`[Price Extraction] ✓ SUCCESS: Extracted symbol-matched price ${price} using regex (symbol: ${ticker})`);
+        return price;
+      } else {
+        console.warn(`[Price Extraction] Found symbol-matched price ${price} but validation failed`);
+      }
+    }
+
+    // STRATEGY 3: Last resort - collect all prices but LOG WARNING
+    // This is unreliable and should rarely be used
+    console.warn(`[Price Extraction] WARNING: Could not find ticker-specific price, falling back to generic price extraction (unreliable)`);
+
     const priceRegex = /"regularMarketPrice":\s*\{\s*"raw"\s*:\s*([0-9.]+)/g;
     const allMatches: number[] = [];
     let match;
@@ -368,13 +416,11 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
       const validPrices = allMatches.filter(p => validatePrice(p, ticker));
 
       if (validPrices.length > 0) {
-        // Use the FIRST valid price (not smallest!)
-        // First occurrence in HTML is most likely the current/live price
         const price = validPrices[0];
         if (price === undefined) {
           throw new Error('Failed to extract valid price after filtering');
         }
-        console.log(`[Price Extraction] ✓ SUCCESS: Extracted price ${price} using regex fallback (first of ${validPrices.length} valid matches)`);
+        console.warn(`[Price Extraction] ⚠ FALLBACK: Using first valid price ${price} (of ${validPrices.length} matches) - may be inaccurate!`);
         if (validPrices.length > 1) {
           console.log(`[Price Debug] Other valid prices found (discarded): ${validPrices.slice(1).join(', ')}`);
         }
