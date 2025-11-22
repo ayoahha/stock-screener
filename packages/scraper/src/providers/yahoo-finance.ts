@@ -347,12 +347,26 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
     console.log('[Price Extraction] DOM extraction failed. Searching page source with regex...');
     const content = await page.content();
 
+    // STRATEGY 0: DEBUG - Find ALL occurrences of the ticker in the JSON to understand structure
+    const tickerRegexSafe = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    console.log(`[Price Debug] Searching for all occurrences of "${ticker}" in page source...`);
+
+    // Find ticker mentions with surrounding context (100 chars before and after)
+    const tickerContextRegex = new RegExp(`.{0,100}"${tickerRegexSafe}".{0,100}`, 'gi');
+    const tickerContextMatches = content.match(tickerContextRegex);
+
+    if (tickerContextMatches && tickerContextMatches.length > 0) {
+      console.log(`[Price Debug] Found ${tickerContextMatches.length} occurrences of "${ticker}". Showing first 5 with context:`);
+      tickerContextMatches.slice(0, 5).forEach((match, i) => {
+        console.log(`[Price Debug] Occurrence ${i + 1}: ...${match}...`);
+      });
+    } else {
+      console.warn(`[Price Debug] No occurrences of "${ticker}" found in page source!`);
+    }
+
     // STRATEGY 1: Find ticker-specific price in JSON structure
     // Yahoo embeds data like: "AAPL":{"regularMarketPrice":{"raw":230.45,"fmt":"230.45"},...}
     // We need to match the SPECIFIC ticker to avoid grabbing prices from trending/related stocks
-
-    // Clean ticker for regex (escape special characters like ^, .)
-    const tickerRegexSafe = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Pattern: Look for ticker symbol followed by regularMarketPrice
     // Allows for other JSON properties between ticker and price
@@ -365,12 +379,15 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
 
     if (tickerMatch && tickerMatch[1]) {
       const price = parseFloat(tickerMatch[1]);
+      console.log(`[Price Debug] Strategy 1 matched! Raw match: "${tickerMatch[0].substring(0, 150)}..."`);
       if (!isNaN(price) && validatePrice(price, ticker)) {
         console.log(`[Price Extraction] ✓ SUCCESS: Extracted ticker-matched price ${price} using regex (ticker: ${ticker})`);
         return price;
       } else {
         console.warn(`[Price Extraction] Found ticker-matched price ${price} but validation failed`);
       }
+    } else {
+      console.warn(`[Price Debug] Strategy 1 FAILED - Pattern did not match`);
     }
 
     // STRATEGY 2: If ticker match fails, try finding symbol in quote context
@@ -384,15 +401,47 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
 
     if (symbolMatch && symbolMatch[1]) {
       const price = parseFloat(symbolMatch[1]);
+      console.log(`[Price Debug] Strategy 2 matched! Raw match: "${symbolMatch[0].substring(0, 150)}..."`);
       if (!isNaN(price) && validatePrice(price, ticker)) {
         console.log(`[Price Extraction] ✓ SUCCESS: Extracted symbol-matched price ${price} using regex (symbol: ${ticker})`);
         return price;
       } else {
         console.warn(`[Price Extraction] Found symbol-matched price ${price} but validation failed`);
       }
+    } else {
+      console.warn(`[Price Debug] Strategy 2 FAILED - Pattern did not match`);
     }
 
-    // STRATEGY 3: Last resort - collect all prices but LOG WARNING
+    // STRATEGY 3: Try broader search - find where ticker appears near a price
+    // Look for: "symbol":"AAPL" anywhere, then find nearest regularMarketPrice
+    console.log(`[Price Debug] Trying Strategy 3: Find symbol field, then nearest price...`);
+    const symbolFieldRegex = new RegExp(`"symbol"\\s*:\\s*"${tickerRegexSafe}"`, 'gi');
+    let symbolFieldMatch;
+    const symbolPositions: number[] = [];
+
+    while ((symbolFieldMatch = symbolFieldRegex.exec(content)) !== null) {
+      symbolPositions.push(symbolFieldMatch.index);
+      // Get 500 chars of context around this symbol mention
+      const contextStart = Math.max(0, symbolFieldMatch.index - 250);
+      const contextEnd = Math.min(content.length, symbolFieldMatch.index + 250);
+      const context = content.substring(contextStart, contextEnd);
+      console.log(`[Price Debug] Found "symbol":"${ticker}" at position ${symbolFieldMatch.index}. Context: ...${context}...`);
+
+      // Try to find regularMarketPrice near this symbol
+      const nearbyPriceRegex = /"regularMarketPrice"\s*:\s*\{\s*"raw"\s*:\s*([0-9.]+)/;
+      const nearbyMatch = context.match(nearbyPriceRegex);
+      if (nearbyMatch && nearbyMatch[1]) {
+        const price = parseFloat(nearbyMatch[1]);
+        if (!isNaN(price) && validatePrice(price, ticker)) {
+          console.log(`[Price Extraction] ✓ SUCCESS: Found price ${price} near symbol field at position ${symbolFieldMatch.index}`);
+          return price;
+        }
+      }
+    }
+
+    console.log(`[Price Debug] Found ${symbolPositions.length} "symbol":"${ticker}" occurrences, but no valid nearby prices`);
+
+    // STRATEGY 4: Last resort - collect all prices but LOG WARNING
     // This is unreliable and should rarely be used
     console.warn(`[Price Extraction] WARNING: Could not find ticker-specific price, falling back to generic price extraction (unreliable)`);
 
