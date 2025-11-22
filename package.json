@@ -11,8 +11,8 @@
   },
   "packageManager": "pnpm@10.23.0",
   "scripts": {
-    "postinstall": "playwright install chromium --with-deps || echo 'Warning: Playwright browser installation failed. Run: pnpm playwright:install'",
-    "playwright:install": "playwright install chromium --with-deps",
+    "postinstall": "pnpm playwright:install || true",
+    "playwright:install": "cd packages/scraper && pnpm exec playwright install chromium --with-deps",
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "start": "pnpm --filter @stock-screener/web start",
