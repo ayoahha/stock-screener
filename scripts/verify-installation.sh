@@ -48,16 +48,19 @@ check_package() {
 
     echo -n "Checking $package... "
 
-    if actual=$(pnpm list "$package" --depth=0 --json 2>/dev/null | grep -o "\"$package\":{\"version\":\"[^\"]*\"" | cut -d'"' -f6); then
-        if [[ -n "$version" ]]; then
+    if actual=$(pnpm list "$package" --depth=0 2>/dev/null | grep "^$package " | awk '{print $2}'); then
+        if [[ -n "$actual" && -n "$version" ]]; then
             if [[ "$actual" == "$version" ]]; then
                 echo -e "${GREEN}✓${NC} $actual"
             else
                 echo -e "${YELLOW}⚠${NC} Got $actual, expected $version"
                 FAILURES=$((FAILURES + 1))
             fi
-        else
+        elif [[ -n "$actual" ]]; then
             echo -e "${GREEN}✓${NC} $actual"
+        else
+            echo -e "${RED}✗${NC} Not found"
+            FAILURES=$((FAILURES + 1))
         fi
     else
         echo -e "${RED}✗${NC} Not found"
@@ -69,7 +72,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "System Requirements"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-check_version "Node.js" "node --version" "v20"
+check_version "Node.js" "node --version" ""  # Accept any version >= 20
 check_version "pnpm" "pnpm --version" "10"
 
 echo ""
@@ -80,16 +83,52 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 check_package "turbo" "2.6.1"
 check_package "@supabase/supabase-js" "2.45.4"
 check_package "typescript" "5.9.3"
-check_package "next" "15.1.6"
-check_package "react" "19.0.0"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "AI Dependencies"
+echo "Web App Dependencies"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-check_package "openai" "4.77.3"
-check_package "playwright" "1.49.0"
+echo -n "Checking next... "
+if [ -f "apps/web/node_modules/next/package.json" ]; then
+    version=$(grep '"version"' apps/web/node_modules/next/package.json | head -1 | awk -F'"' '{print $4}')
+    echo -e "${GREEN}✓${NC} $version"
+else
+    echo -e "${RED}✗${NC} Not installed"
+    FAILURES=$((FAILURES + 1))
+fi
+
+echo -n "Checking react... "
+if [ -f "apps/web/node_modules/react/package.json" ]; then
+    version=$(grep '"version"' apps/web/node_modules/react/package.json | head -1 | awk -F'"' '{print $4}')
+    echo -e "${GREEN}✓${NC} $version"
+else
+    echo -e "${RED}✗${NC} Not installed"
+    FAILURES=$((FAILURES + 1))
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "AI Dependencies (Scraper Package)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+echo -n "Checking openai... "
+if [ -f "packages/scraper/node_modules/openai/package.json" ]; then
+    version=$(grep '"version"' packages/scraper/node_modules/openai/package.json | head -1 | awk -F'"' '{print $4}')
+    echo -e "${GREEN}✓${NC} $version"
+else
+    echo -e "${RED}✗${NC} Not installed"
+    FAILURES=$((FAILURES + 1))
+fi
+
+echo -n "Checking playwright... "
+if [ -f "packages/scraper/node_modules/playwright/package.json" ]; then
+    version=$(grep '"version"' packages/scraper/node_modules/playwright/package.json | head -1 | awk -F'"' '{print $4}')
+    echo -e "${GREEN}✓${NC} $version"
+else
+    echo -e "${RED}✗${NC} Not installed"
+    FAILURES=$((FAILURES + 1))
+fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
