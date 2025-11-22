@@ -151,23 +151,32 @@ export async function scrapeYahooFinance(ticker: string): Promise<StockData> {
         'Cash And Cash Equivalents': 'CashAndEquivalents',
         'Total Debt': 'TotalDebt',
         'Total Debt Net Minority Interest': 'TotalDebt', // Alternative label
+        'Net Debt': 'NetDebt', // Net Debt = Total Debt - Cash
         'Inventory': 'Inventory',
         'Accounts Receivable': 'AccountsReceivable',
         'Accounts Payable': 'AccountsPayable',
         'Working Capital': 'WorkingCapital',
-        'Total Current Assets': 'TotalCurrentAssets', // New
-        'Total Current Liabilities Net Minority Interest': 'TotalCurrentLiabilities', // New
+        'Total Current Assets': 'TotalCurrentAssets',
+        'Total Current Liabilities Net Minority Interest': 'TotalCurrentLiabilities',
         'Current Liabilities': 'TotalCurrentLiabilities' // Alternative
       };
       const balanceData = await extractFinancialData(page, ticker, 'balance-sheet', balanceMap);
       ratios = { ...ratios, ...balanceData };
+
+      // Calculate Cash from Net Debt if not available directly
+      // Net Debt = Total Debt - Cash → Cash = Total Debt - Net Debt
+      if (!ratios.CashAndEquivalents && ratios.TotalDebt !== undefined && ratios.NetDebt !== undefined) {
+        ratios.CashAndEquivalents = ratios.TotalDebt - ratios.NetDebt;
+        console.log(`[Balance Sheet] ✓ Calculated CashAndEquivalents: ${ratios.CashAndEquivalents} (from Net Debt)`);
+      }
 
       // 4. Cash Flow
       const cashFlowMap: Record<string, keyof FinancialRatios> = {
         'Operating Cash Flow': 'OperatingCashFlow',
         'Free Cash Flow': 'FreeCashFlow',
         'Capital Expenditure': 'CAPEX',
-        'Cash Dividends Paid': 'DividendsPaid'
+        'Cash Dividends Paid': 'DividendsPaid',
+        'End Cash Position': 'CashAndEquivalents' // Alternative source for cash
       };
       const cashFlowData = await extractFinancialData(page, ticker, 'cash-flow', cashFlowMap);
       ratios = { ...ratios, ...cashFlowData };

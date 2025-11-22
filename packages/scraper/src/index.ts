@@ -100,6 +100,7 @@ export interface FinancialRatios {
   ShortTermDebt?: number;
   LongTermDebt?: number;
   TotalDebt?: number;
+  NetDebt?: number; // Total Debt - Cash
   Inventory?: number;
   AccountsReceivable?: number;
   AccountsPayable?: number;
