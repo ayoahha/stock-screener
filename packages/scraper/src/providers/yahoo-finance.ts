@@ -149,16 +149,20 @@ export async function scrapeYahooFinance(ticker: string): Promise<StockData> {
         'Total Liabilities Net Minority Interest': 'TotalLiabilities',
         'Total Equity Gross Minority Interest': 'TotalEquity',
         'Cash And Cash Equivalents': 'CashAndEquivalents',
+        'Cash Cash Equivalents And Short Term Investments': 'CashAndEquivalents', // Alternative
         'Total Debt': 'TotalDebt',
         'Total Debt Net Minority Interest': 'TotalDebt', // Alternative label
         'Net Debt': 'NetDebt', // Net Debt = Total Debt - Cash
+        'Current Assets': 'TotalCurrentAssets', // Try without "Total" prefix
+        'Current Liabilities': 'TotalCurrentLiabilities',
         'Inventory': 'Inventory',
+        'Receivables': 'AccountsReceivable', // Try without "Accounts" prefix
         'Accounts Receivable': 'AccountsReceivable',
         'Accounts Payable': 'AccountsPayable',
+        'Payables': 'AccountsPayable', // Alternative
         'Working Capital': 'WorkingCapital',
         'Total Current Assets': 'TotalCurrentAssets',
         'Total Current Liabilities Net Minority Interest': 'TotalCurrentLiabilities',
-        'Current Liabilities': 'TotalCurrentLiabilities' // Alternative
       };
       const balanceData = await extractFinancialData(page, ticker, 'balance-sheet', balanceMap);
       ratios = { ...ratios, ...balanceData };
