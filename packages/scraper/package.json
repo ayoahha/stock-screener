@@ -12,11 +12,12 @@
   },
   "dependencies": {
     "@stock-screener/database": "workspace:*",
+    "axios": "^1.6.5",
     "cheerio": "^1.0.0-rc.12",
+    "openai": "^6.9.1",
     "playwright": "^1.41.1",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "axios": "^1.6.5",
     "zod": "^3.22.4"
   },
   "devDependencies": {

@@ -24,8 +24,9 @@ export interface StockData {
   price: number;
   currency: string;
   ratios: FinancialRatios;
-  source: 'yahoo' | 'yahoo-query' | 'fmp' | 'polygon' | 'scraping';
+  source: 'yahoo' | 'yahoo-query' | 'fmp' | 'polygon' | 'scraping' | 'ai';
   fetchedAt: Date;
+  confidence?: number; // AI confidence score (0-1), present when source = 'ai'
 }
 
 export interface FinancialRatios {
