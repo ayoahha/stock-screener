@@ -90,16 +90,16 @@ export default function DashboardPage() {
       {/* Enhanced Error Display */}
       {error && (
         <div className="mb-8 animate-fade-in">
-          <Card variant="elevated" className="p-6 bg-red-50 border-red-200">
+          <Card variant="elevated" className="p-6 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-red-100">
-                <AlertCircle className="h-5 w-5 text-red-600" />
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/50">
+                <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-red-900 mb-1">
+                <h3 className="text-lg font-bold text-red-900 dark:text-red-200 mb-1">
                   Erreur lors du chargement
                 </h3>
-                <p className="text-red-700">
+                <p className="text-red-700 dark:text-red-300">
                   {error.message || 'Une erreur est survenue'}
                 </p>
               </div>
@@ -198,7 +198,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-fade-in">
         {/* Left Column: Score Gauge */}
         <div className="xl:col-span-1">
-          <Card variant="elevated" className="p-8 bg-gradient-to-br from-white to-gray-50/30">
+          <Card variant="elevated" className="p-8 bg-gradient-to-br from-white to-gray-50/30 dark:from-card dark:to-muted/30">
             <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
               Score Global
             </h2>
@@ -248,7 +248,7 @@ export default function DashboardPage() {
         {/* AI Insights Section - Enhanced */}
         {stockData && scoringResult && classification && (
           <div className="mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <Card variant="elevated" className="p-8 bg-gradient-to-br from-purple-50/50 to-blue-50/50 border-purple-200/50">
+            <Card variant="elevated" className="p-8 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-200/50 dark:border-purple-800/50">
               <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
                 Analyse IA Qualitative
               </h2>

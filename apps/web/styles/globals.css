@@ -35,24 +35,39 @@
   }
 
   .dark {
+    /* Rich dark navy background */
     --background: 222.2 47% 11%;
     --foreground: 210 40% 98%;
-    --card: 217.2 33% 17%;
+
+    /* Cards with better contrast - lighter slate with blue tint */
+    --card: 220 25% 20%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 47% 11%;
+
+    --popover: 220 25% 20%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
+
+    /* Primary - gold accent for dark mode */
+    --primary: 43 96% 56%;
     --primary-foreground: 222.2 47% 11%;
-    --secondary: 217.2 32.6% 17.5%;
+
+    /* Secondary - medium slate for subtle elements */
+    --secondary: 220 20% 25%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+
+    /* Muted - lighter than cards for contrast */
+    --muted: 220 20% 25%;
+    --muted-foreground: 220 15% 70%;
+
+    /* Gold accent maintains brand */
     --accent: 43 96% 56%;
     --accent-foreground: 222.2 47% 11%;
-    --destructive: 0 62.8% 30.6%;
+
+    --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+
+    /* Visible borders with blue-grey tint */
+    --border: 220 25% 30%;
+    --input: 220 25% 25%;
     --ring: 43 96% 56%;
   }
 }

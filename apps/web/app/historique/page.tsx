@@ -149,7 +149,7 @@ export default function HistoriquePage() {
         {/* Enhanced Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-blue-50/30 border-l-4 border-blue-500">
+          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-blue-50/30 dark:from-card dark:to-blue-950/30 border-l-4 border-blue-500 dark:border-blue-400">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
@@ -159,13 +159,13 @@ export default function HistoriquePage() {
                   {stats.total_stocks || 0}
                 </p>
               </div>
-              <div className="p-2 rounded-lg bg-blue-100">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
+              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-950/50">
+                <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </Card>
 
-          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-indigo-50/30 border-l-4 border-indigo-500">
+          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-indigo-50/30 dark:from-card dark:to-indigo-950/30 border-l-4 border-indigo-500 dark:border-indigo-400">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
@@ -175,13 +175,13 @@ export default function HistoriquePage() {
                   {stats.value_stocks || 0}
                 </p>
               </div>
-              <div className="p-2 rounded-lg bg-indigo-100">
-                <TrendingDown className="h-5 w-5 text-indigo-600" />
+              <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-950/50">
+                <TrendingDown className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               </div>
             </div>
           </Card>
 
-          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-green-50/30 border-l-4 border-green-500">
+          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-green-50/30 dark:from-card dark:to-green-950/30 border-l-4 border-green-500 dark:border-green-400">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
@@ -191,13 +191,13 @@ export default function HistoriquePage() {
                   {stats.growth_stocks || 0}
                 </p>
               </div>
-              <div className="p-2 rounded-lg bg-green-100">
-                <TrendingUp className="h-5 w-5 text-green-600" />
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-950/50">
+                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </Card>
 
-          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-amber-50/30 border-l-4 border-amber-500">
+          <Card variant="interactive" className="p-5 bg-gradient-to-br from-white to-amber-50/30 dark:from-card dark:to-amber-950/30 border-l-4 border-amber-500 dark:border-amber-400">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
@@ -207,8 +207,8 @@ export default function HistoriquePage() {
                   {stats.dividend_stocks || 0}
                 </p>
               </div>
-              <div className="p-2 rounded-lg bg-amber-100">
-                <DollarSign className="h-5 w-5 text-amber-600" />
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-950/50">
+                <DollarSign className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
           </Card>
@@ -263,16 +263,16 @@ export default function HistoriquePage() {
 
       {/* Enhanced Error Display */}
       {error && (
-        <Card variant="elevated" className="p-6 bg-red-50 border-red-200 mb-8 animate-fade-in">
+        <Card variant="elevated" className="p-6 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50 mb-8 animate-fade-in">
           <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-red-100">
-              <AlertCircle className="h-5 w-5 text-red-600" />
+            <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/50">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-red-900 mb-1">
+              <h3 className="text-lg font-bold text-red-900 dark:text-red-200 mb-1">
                 Erreur lors du chargement
               </h3>
-              <p className="text-red-700">{error.message || 'Une erreur est survenue'}</p>
+              <p className="text-red-700 dark:text-red-300">{error.message || 'Une erreur est survenue'}</p>
             </div>
           </div>
         </Card>
@@ -349,12 +349,12 @@ export default function HistoriquePage() {
                         <span
                           className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold shadow-sm ${
                             stock.score >= 75
-                              ? 'bg-green-100 text-green-800 border border-green-200'
+                              ? 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700'
                               : stock.score >= 60
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                              ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700'
                               : stock.score >= 40
-                              ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                              : 'bg-red-100 text-red-800 border border-red-200'
+                              ? 'bg-yellow-100 dark:bg-yellow-950/50 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700'
+                              : 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-700'
                           }`}
                         >
                           {stock.score}/100
@@ -416,7 +416,7 @@ export default function HistoriquePage() {
           <Card variant="elevated" className="overflow-hidden animate-fade-in hidden md:block">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-border" aria-label="Historique des actions analysées">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100/50">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-muted dark:to-muted/70">
                 <tr>
                   <th
                     scope="col"
@@ -521,12 +521,12 @@ export default function HistoriquePage() {
                           <span
                             className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold shadow-sm ${
                               stock.score >= 75
-                                ? 'bg-green-100 text-green-800 border border-green-200'
+                                ? 'bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-700'
                                 : stock.score >= 60
-                                ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-700'
                                 : stock.score >= 40
-                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                                : 'bg-red-100 text-red-800 border border-red-200'
+                                ? 'bg-yellow-100 dark:bg-yellow-950/50 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700'
+                                : 'bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-700'
                             }`}
                           >
                             {stock.score}/100
