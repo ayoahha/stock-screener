@@ -19,6 +19,10 @@
  * - Validation des prix
  * - Protection contre le rate limiting Yahoo (Query API désactivé par défaut)
  * - AI cost tracking et budget enforcement
+ * - **NOUVEAU:** Rate limiting pour scraping (Yahoo/FMP) pour éviter les bans IP
+ *   - 3 secondes minimum entre requêtes (configurable)
+ *   - Max 50 requêtes/heure (configurable)
+ *   - Max 5 tentatives par ticker/heure
  */
 
 import type { StockData } from '../index';
@@ -51,6 +55,7 @@ const AI_FALLBACK_MODEL = process.env.AI_FALLBACK_MODEL;
 let aiProvider: AIProvider | null = null;
 let budgetManager: BudgetManager | null = null;
 let rateLimiter: RateLimiter | null = null;
+let scrapingRateLimiter: RateLimiter | null = null;
 
 // Initialize AI components
 function initializeAI() {
@@ -82,6 +87,30 @@ function initializeAI() {
   return true;
 }
 
+// Initialize scraping rate limiter
+function initializeScrapingRateLimiter() {
+  if (!scrapingRateLimiter) {
+    // Conservative rate limiting for scraping to avoid IP bans
+    // - 3 seconds between requests (slower than AI)
+    // - Max 50 requests per hour (conservative)
+    // - Max 5 retries per ticker per hour
+    scrapingRateLimiter = new RateLimiter({
+      minCallIntervalMs: parseInt(process.env.SCRAPING_MIN_INTERVAL_MS || '3000'), // 3 seconds
+      maxCallsPerHour: parseInt(process.env.SCRAPING_MAX_CALLS_PER_HOUR || '50'),
+      maxRetriesPerTicker: parseInt(process.env.SCRAPING_MAX_RETRIES_PER_TICKER || '5')
+    });
+  }
+  return scrapingRateLimiter;
+}
+
+// Helper to wait for rate limit
+async function waitForRateLimit(rateLimitResult: { allowed: boolean; waitMs?: number; reason?: string }) {
+  if (!rateLimitResult.allowed && rateLimitResult.waitMs) {
+    console.log(`[Fallback] Rate limited, waiting ${rateLimitResult.waitMs}ms...`);
+    await new Promise(resolve => setTimeout(resolve, rateLimitResult.waitMs));
+  }
+}
+
 export async function fetchWithFallback(ticker: string): Promise<StockData> {
   if (!ticker || ticker.trim() === '') {
     throw new Error('Ticker cannot be empty');
@@ -90,13 +119,25 @@ export async function fetchWithFallback(ticker: string): Promise<StockData> {
   const attempts: FallbackAttempt[] = [];
   let lastError: Error | null = null;
 
+  // Initialize scraping rate limiter
+  const scrapingLimiter = initializeScrapingRateLimiter();
+
   // Strategy 1: Yahoo Finance Query API (OPTIONAL - disabled by default)
   // NOTE: Currently returns 401 errors without cookie/crumb authentication
   // See: .github/ISSUE_YAHOO_API_AUTH.md for implementation details
   if (ENABLE_YAHOO_QUERY_API) {
     try {
       console.log(`[Fallback] Attempting Yahoo Query API for ${ticker}...`);
+
+      // Check rate limit before making request
+      const rateCheck = scrapingLimiter.canMakeCall(ticker);
+      if (!rateCheck.allowed) {
+        console.log(`[Fallback] ✗ Yahoo Query API rate limited: ${rateCheck.reason}`);
+        await waitForRateLimit(rateCheck);
+      }
+
       const startTime = Date.now();
+      scrapingLimiter.recordCall(ticker);
 
       const data = await fetchFromYahooQueryAPI(ticker);
 
@@ -118,7 +159,16 @@ export async function fetchWithFallback(ticker: string): Promise<StockData> {
   // Most comprehensive data, especially for European stocks
   try {
     console.log(`[Fallback] Attempting Yahoo Finance HTML scraping for ${ticker}...`);
+
+    // Check rate limit before making request
+    const rateCheck = scrapingLimiter.canMakeCall(ticker);
+    if (!rateCheck.allowed) {
+      console.log(`[Fallback] ✗ Yahoo scraping rate limited: ${rateCheck.reason}`);
+      await waitForRateLimit(rateCheck);
+    }
+
     const startTime = Date.now();
+    scrapingLimiter.recordCall(ticker);
 
     const data = await scrapeYahooFinance(ticker);
 
@@ -254,7 +304,16 @@ export async function fetchWithFallback(ticker: string): Promise<StockData> {
   // NOTE: Legacy endpoints deprecated as of Aug 2025, may require paid plan
   try {
     console.log(`[Fallback] Attempting FMP API for ${ticker}...`);
+
+    // Check rate limit before making request
+    const rateCheck = scrapingLimiter.canMakeCall(ticker);
+    if (!rateCheck.allowed) {
+      console.log(`[Fallback] ✗ FMP API rate limited: ${rateCheck.reason}`);
+      await waitForRateLimit(rateCheck);
+    }
+
     const startTime = Date.now();
+    scrapingLimiter.recordCall(ticker);
 
     const data = await fetchFromFMP(ticker);
 
