@@ -44,10 +44,8 @@ const ENABLE_AI_FALLBACK = process.env.ENABLE_AI_FALLBACK !== 'false'; // Enable
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 // AI Configuration
-const AI_PRIMARY_MODEL = (process.env.AI_PRIMARY_MODEL || 'kimi') as 'kimi' | 'deepseek';
-const AI_FALLBACK_MODEL = (process.env.AI_FALLBACK_MODEL || 'deepseek') as 'kimi' | 'deepseek';
-const AI_KIMI_MODEL_ID = process.env.AI_KIMI_MODEL_ID;
-const AI_DEEPSEEK_MODEL_ID = process.env.AI_DEEPSEEK_MODEL_ID;
+const AI_PRIMARY_MODEL = process.env.AI_PRIMARY_MODEL || 'deepseek/deepseek-chat';
+const AI_FALLBACK_MODEL = process.env.AI_FALLBACK_MODEL;
 
 // Singleton instances
 let aiProvider: AIProvider | null = null;
@@ -65,9 +63,7 @@ function initializeAI() {
     aiProvider = new AIProvider({
       apiKey: OPENROUTER_API_KEY,
       primaryModel: AI_PRIMARY_MODEL,
-      fallbackModel: AI_FALLBACK_MODEL,
-      kimiModelId: AI_KIMI_MODEL_ID,
-      deepseekModelId: AI_DEEPSEEK_MODEL_ID
+      fallbackModel: AI_FALLBACK_MODEL
     });
   }
 

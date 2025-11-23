@@ -64,10 +64,8 @@ export const analysisRouter = router({
         if (!aiProvider) {
           aiProvider = new AIProvider({
             apiKey: OPENROUTER_API_KEY,
-            primaryModel: (process.env.AI_PRIMARY_MODEL || 'deepseek') as 'kimi' | 'deepseek',
-            fallbackModel: (process.env.AI_FALLBACK_MODEL || 'deepseek') as 'kimi' | 'deepseek',
-            kimiModelId: process.env.AI_KIMI_MODEL_ID,
-            deepseekModelId: process.env.AI_DEEPSEEK_MODEL_ID,
+            primaryModel: process.env.AI_PRIMARY_MODEL || 'deepseek/deepseek-chat',
+            fallbackModel: process.env.AI_FALLBACK_MODEL,
           });
         }
 

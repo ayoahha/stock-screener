@@ -12,15 +12,12 @@
  */
 
 import type { StockData } from '../index';
-import { KimiClient, type KimiResponse } from './kimi-client';
-import { DeepSeekClient, type DeepSeekResponse } from './deepseek-client';
+import OpenAI from 'openai';
 
 export interface AIProviderConfig {
   apiKey: string;
-  primaryModel: 'kimi' | 'deepseek';
-  fallbackModel?: 'kimi' | 'deepseek';
-  kimiModelId?: string;
-  deepseekModelId?: string;
+  primaryModel: string;
+  fallbackModel?: string;
 }
 
 export interface AIStockData extends StockData {
@@ -33,30 +30,20 @@ export interface AIStockData extends StockData {
  * AI Provider for fetching stock financial data
  */
 export class AIProvider {
-  private kimiClient?: KimiClient;
-  private deepseekClient: DeepSeekClient;
+  private client: OpenAI;
   private config: AIProviderConfig;
 
   constructor(config: AIProviderConfig) {
     this.config = config;
 
-    // Initialize clients based on configuration
-    try {
-      this.kimiClient = new KimiClient({
-        apiKey: config.apiKey,
-        model: config.kimiModelId, // Use custom model ID if provided
-        temperature: 0.1,
-        maxTokens: 1500
-      });
-    } catch (error) {
-      console.warn('[AI Provider] Kimi client initialization failed, will use DeepSeek only');
-    }
-
-    this.deepseekClient = new DeepSeekClient({
+    // Initialize OpenAI client pointing to OpenRouter
+    this.client = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
       apiKey: config.apiKey,
-      model: config.deepseekModelId, // Use custom model ID if provided
-      temperature: 0.1,
-      maxTokens: 1500
+      defaultHeaders: {
+        'HTTP-Referer': 'https://github.com/ayoahha/stock-screener',
+        'X-Title': 'Stock Screener'
+      }
     });
   }
 
@@ -71,39 +58,19 @@ export class AIProvider {
     cost: number;
   }> {
     const prompt = this.buildDataFetchPrompt(ticker);
-    let response: KimiResponse | DeepSeekResponse;
-    let model: string;
-    let cost: number;
+    let modelToUse = this.config.primaryModel;
+    let response: { content: string; tokensInput: number; tokensOutput: number; model: string };
 
     // Try primary model first
     try {
-      if (this.config.primaryModel === 'kimi' && this.kimiClient) {
-        console.log(`[AI Provider] Using Kimi-K2 for ${ticker}`);
-        response = await this.kimiClient.chat(prompt);
-        model = response.model;
-        cost = KimiClient.estimateCost(response.tokensInput, response.tokensOutput);
-      } else {
-        console.log(`[AI Provider] Using DeepSeek for ${ticker}`);
-        response = await this.deepseekClient.chat(prompt);
-        model = response.model;
-        cost = DeepSeekClient.estimateCost(response.tokensInput, response.tokensOutput);
-      }
+      console.log(`[AI Provider] Using model ${modelToUse} for ${ticker}`);
+      response = await this.chat(prompt, modelToUse);
     } catch (error) {
       // Try fallback model if primary fails
       if (this.config.fallbackModel) {
         console.warn(`[AI Provider] Primary model failed, trying fallback: ${error instanceof Error ? error.message : 'Unknown error'}`);
-
-        if (this.config.fallbackModel === 'deepseek') {
-          response = await this.deepseekClient.chat(prompt);
-          model = response.model;
-          cost = DeepSeekClient.estimateCost(response.tokensInput, response.tokensOutput);
-        } else if (this.config.fallbackModel === 'kimi' && this.kimiClient) {
-          response = await this.kimiClient.chat(prompt);
-          model = response.model;
-          cost = KimiClient.estimateCost(response.tokensInput, response.tokensOutput);
-        } else {
-          throw error;
-        }
+        modelToUse = this.config.fallbackModel;
+        response = await this.chat(prompt, modelToUse);
       } else {
         throw error;
       }
@@ -112,11 +79,14 @@ export class AIProvider {
     // Parse response
     const data = this.parseDataResponse(response.content, ticker);
 
+    // Estimate cost (rough estimate: $0.0002 per 1K tokens average)
+    const cost = ((response.tokensInput + response.tokensOutput) / 1000) * 0.0002;
+
     return {
       data,
       tokensInput: response.tokensInput,
       tokensOutput: response.tokensOutput,
-      model,
+      model: response.model,
       cost
     };
   }
@@ -139,24 +109,65 @@ export class AIProvider {
     cost: number;
   }> {
     const prompt = this.buildAnalysisPrompt(input);
-    let response: KimiResponse | DeepSeekResponse;
-    let model: string;
-    let cost: number;
 
-    // Always use DeepSeek for analysis (cheaper)
-    response = await this.deepseekClient.chat(prompt);
-    model = response.model;
-    cost = DeepSeekClient.estimateCost(response.tokensInput, response.tokensOutput);
+    // Use primary model for analysis
+    const response = await this.chat(prompt, this.config.primaryModel);
 
     // Parse response
     const analysis = this.parseAnalysisResponse(response.content);
+
+    // Estimate cost
+    const cost = ((response.tokensInput + response.tokensOutput) / 1000) * 0.0002;
 
     return {
       analysis,
       tokensInput: response.tokensInput,
       tokensOutput: response.tokensOutput,
-      model,
+      model: response.model,
       cost
+    };
+  }
+
+  /**
+   * Generic chat method
+   */
+  private async chat(prompt: string, model: string): Promise<{
+    content: string;
+    tokensInput: number;
+    tokensOutput: number;
+    model: string;
+  }> {
+    const startTime = Date.now();
+
+    const completion = await this.client.chat.completions.create({
+      model: model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a financial data API. Respond ONLY with valid JSON. No explanations, no markdown, no preamble.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 1500,
+    });
+
+    const responseTime = Date.now() - startTime;
+
+    const content = completion.choices[0]?.message?.content || '';
+    const tokensInput = completion.usage?.prompt_tokens || 0;
+    const tokensOutput = completion.usage?.completion_tokens || 0;
+
+    console.log(`[AI Provider] Response received in ${responseTime}ms (${tokensInput + tokensOutput} tokens)`);
+
+    return {
+      content,
+      tokensInput,
+      tokensOutput,
+      model: completion.model
     };
   }
 
@@ -238,7 +249,7 @@ RESPOND WITH ONLY THE JSON OBJECT. NO MARKDOWN. NO EXPLANATIONS.`;
   }
 
   /**
-   * Build prompt for qualitative analysis
+   * Build prompt for qualitative analysis (French output)
    */
   private buildAnalysisPrompt(input: {
     ticker: string;
@@ -248,49 +259,51 @@ RESPOND WITH ONLY THE JSON OBJECT. NO MARKDOWN. NO EXPLANATIONS.`;
     score: number;
     verdict: string;
   }): string {
-    return `You are a financial analyst specializing in ${input.stockType} stocks. Analyze this stock:
+    const stockTypeLabel = input.stockType === 'value' ? 'valorisation' : input.stockType === 'growth' ? 'croissance' : 'dividende';
 
-STOCK DATA:
-Ticker: ${input.ticker}
-Name: ${input.name}
-Stock Type: ${input.stockType} (value/growth/dividend)
-Current Score: ${input.score}/100 (${input.verdict})
+    return `Vous êtes un analyste financier spécialisé dans les actions de type ${stockTypeLabel}. Analysez cette action :
 
-FINANCIAL RATIOS:
+DONNÉES DE L'ACTION :
+Ticker : ${input.ticker}
+Nom : ${input.name}
+Type d'action : ${input.stockType} (value/growth/dividend)
+Score actuel : ${input.score}/100 (${input.verdict})
+
+RATIOS FINANCIERS :
 ${JSON.stringify(input.ratios, null, 2)}
 
-ANALYSIS REQUIREMENTS:
-1. Summary: 2-3 sentence investment thesis
-2. Strengths: 2-3 positive highlights (specific to ${input.stockType} investing)
-3. Weaknesses: 2-3 concerns (with numbers)
-4. Red Flags: Major risks (if any)
-5. Industry Context: How does this compare to peers?
-6. Investment Thesis: Why buy/avoid? (1 paragraph)
+EXIGENCES DE L'ANALYSE :
+1. Résumé : 2-3 phrases résumant la thèse d'investissement
+2. Points forts : 2-3 points positifs (spécifiques à l'investissement ${stockTypeLabel})
+3. Points faibles : 2-3 préoccupations (avec des chiffres)
+4. Drapeaux rouges : Risques majeurs (s'il y en a)
+5. Contexte sectoriel : Comment se compare-t-elle aux pairs ?
+6. Thèse d'investissement : Pourquoi acheter/éviter ? (1 paragraphe)
 
-OUTPUT FORMAT (JSON ONLY):
+FORMAT DE SORTIE (JSON UNIQUEMENT) :
 {
-  "summary": "Brief 2-3 sentence overview",
+  "summary": "Résumé bref en 2-3 phrases",
   "strengths": [
-    "Specific strength with data (e.g., 'ROE of 18% exceeds industry avg of 12%')",
-    "Another strength"
+    "Point fort spécifique avec données (ex : 'ROE de 18% dépasse la moyenne du secteur de 12%')",
+    "Autre point fort"
   ],
   "weaknesses": [
-    "Specific concern with data",
-    "Another concern"
+    "Préoccupation spécifique avec données",
+    "Autre préoccupation"
   ],
   "redFlags": [
-    "Major risk if any (e.g., 'Debt/Equity 3.2x - unsustainable')"
+    "Risque majeur s'il y en a (ex : 'Dette/Capitaux propres 3.2x - insoutenable')"
   ],
-  "industryContext": "1-2 sentences comparing to sector norms",
-  "investmentThesis": "1 paragraph buy/hold/avoid recommendation with reasoning"
+  "industryContext": "1-2 phrases comparant aux normes du secteur",
+  "investmentThesis": "1 paragraphe avec recommandation achat/conserver/éviter et raisonnement"
 }
 
-FOCUS AREAS BY STOCK TYPE:
-- Value: PE/PB ratios, dividend yield, margin of safety
-- Growth: Revenue/EPS growth, margins, market opportunity
-- Dividend: Yield, payout ratio, dividend growth sustainability
+DOMAINES D'INTÉRÊT PAR TYPE D'ACTION :
+- Value : ratios PE/PB, rendement du dividende, marge de sécurité
+- Growth : croissance du chiffre d'affaires/BPA, marges, opportunité de marché
+- Dividend : rendement, ratio de distribution, durabilité de la croissance du dividende
 
-RESPOND WITH ONLY THE JSON OBJECT. NO MARKDOWN. NO EXPLANATIONS.`;
+RÉPONDEZ UNIQUEMENT AVEC L'OBJET JSON. PAS DE MARKDOWN. PAS D'EXPLICATIONS.`;
   }
 
   /**
