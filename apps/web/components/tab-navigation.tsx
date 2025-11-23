@@ -18,7 +18,7 @@ export function TabNavigation({ tabs }: TabNavigationProps) {
   const pathname = usePathname();
 
   return (
-    <div className="border-b border-gray-200 mb-8">
+    <div className="border-b border-border mb-8">
       <nav className="-mb-px flex space-x-8" aria-label="Tabs">
         {tabs.map((tab) => {
           const isActive = pathname === tab.href;
@@ -27,17 +27,24 @@ export function TabNavigation({ tabs }: TabNavigationProps) {
               key={tab.href}
               href={tab.href}
               className={cn(
-                'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium transition-colors',
+                'group inline-flex items-center border-b-2 py-4 px-1 text-sm font-semibold transition-all duration-300 relative',
                 isActive
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  ? 'border-brand-gold text-foreground'
+                  : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
               )}
             >
+              {/* Subtle background glow for active tab */}
+              {isActive && (
+                <span className="absolute inset-0 -z-10 bg-brand-gold/5 rounded-t-lg" />
+              )}
+
               {tab.icon && (
                 <span
                   className={cn(
-                    'mr-2 h-5 w-5',
-                    isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                    'mr-2 h-5 w-5 transition-all duration-300',
+                    isActive
+                      ? 'text-brand-gold scale-110'
+                      : 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'
                   )}
                 >
                   {tab.icon}
