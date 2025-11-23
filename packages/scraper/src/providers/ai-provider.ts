@@ -152,7 +152,7 @@ export class AIProvider {
         }
       ],
       temperature: 0.1,
-      max_tokens: 3000, // Increased from 1500 to avoid truncation (French responses are longer)
+      max_tokens: 6000, // Increased to 6000 for detailed French analysis with multiple sections
     });
 
     const responseTime = Date.now() - startTime;
@@ -383,12 +383,15 @@ RÉPOND UNIQUEMENT AVEC L'OBJET JSON. PAS DE MARKDOWN. PAS D'EXPLICATIONS.`;
       const parsed = JSON.parse(cleaned);
 
       return {
+        confidenceScore: parsed.confidenceScore,
         summary: parsed.summary || '',
         strengths: parsed.strengths || [],
         weaknesses: parsed.weaknesses || [],
         redFlags: parsed.redFlags || [],
         industryContext: parsed.industryContext || '',
-        investmentThesis: parsed.investmentThesis || ''
+        investmentThesis: parsed.investmentThesis || '',
+        recommendedAction: parsed.recommendedAction,
+        finalConfidence: parsed.finalConfidence
       };
     } catch (error) {
       console.error('[AI Provider] Failed to parse AI analysis response');
@@ -400,10 +403,13 @@ RÉPOND UNIQUEMENT AVEC L'OBJET JSON. PAS DE MARKDOWN. PAS D'EXPLICATIONS.`;
 }
 
 export interface AIAnalysis {
+  confidenceScore?: number;
   summary: string;
   strengths: string[];
   weaknesses: string[];
   redFlags: string[];
   industryContext: string;
   investmentThesis: string;
+  recommendedAction?: string;
+  finalConfidence?: string;
 }
