@@ -57,9 +57,9 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background p-8">
       {/* Enhanced Header with gradient accent */}
-      <header className="mb-8">
+      <header className="mb-8" role="banner">
         <div className="flex items-center gap-3 mb-3">
-          <div className="p-2.5 rounded-xl bg-gradient-to-br from-brand-gold to-brand-gold-light shadow-glow-gold">
+          <div className="p-2.5 rounded-xl bg-gradient-to-br from-brand-gold to-brand-gold-light shadow-glow-gold" aria-hidden="true">
             <TrendingUp className="h-7 w-7 text-white" />
           </div>
           <h1 className="text-5xl font-display font-bold text-foreground tracking-tight">
@@ -72,17 +72,20 @@ export default function DashboardPage() {
       </header>
 
       {/* Tab Navigation */}
-      <TabNavigation
-        tabs={[
-          { label: 'Recherche', href: '/dashboard', icon: <Search className="h-5 w-5" /> },
-          { label: 'Historique', href: '/historique', icon: <History className="h-5 w-5" /> },
-        ]}
-      />
+      <nav aria-label="Navigation principale">
+        <TabNavigation
+          tabs={[
+            { label: 'Recherche', href: '/dashboard', icon: <Search className="h-5 w-5" /> },
+            { label: 'Historique', href: '/historique', icon: <History className="h-5 w-5" /> },
+          ]}
+        />
+      </nav>
 
-      {/* Search Section */}
-      <div className="mb-8">
-        <StockSearch onStockSelected={(ticker) => setSelectedTicker(ticker)} />
-      </div>
+      <main id="main-content">
+        {/* Search Section */}
+        <div className="mb-8">
+          <StockSearch onStockSelected={(ticker) => setSelectedTicker(ticker)} />
+        </div>
 
       {/* Enhanced Error Display */}
       {error && (
@@ -242,24 +245,25 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* AI Insights Section - Enhanced */}
-      {stockData && scoringResult && classification && (
-        <div className="mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <Card variant="elevated" className="p-8 bg-gradient-to-br from-purple-50/50 to-blue-50/50 border-purple-200/50">
-            <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
-              Analyse IA Qualitative
-            </h2>
-            <AIInsightsButton
-              ticker={stockData.ticker}
-              name={stockData.name}
-              ratios={stockData.ratios as Record<string, number | null>}
-              stockType={classification.stockType}
-              score={scoringResult.score}
-              verdict={scoringResult.verdict}
-            />
-          </Card>
-        </div>
-      )}
+        {/* AI Insights Section - Enhanced */}
+        {stockData && scoringResult && classification && (
+          <div className="mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            <Card variant="elevated" className="p-8 bg-gradient-to-br from-purple-50/50 to-blue-50/50 border-purple-200/50">
+              <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
+                Analyse IA Qualitative
+              </h2>
+              <AIInsightsButton
+                ticker={stockData.ticker}
+                name={stockData.name}
+                ratios={stockData.ratios as Record<string, number | null>}
+                stockType={classification.stockType}
+                score={scoringResult.score}
+                verdict={scoringResult.verdict}
+              />
+            </Card>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
