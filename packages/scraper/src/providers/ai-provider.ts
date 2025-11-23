@@ -152,7 +152,7 @@ export class AIProvider {
         }
       ],
       temperature: 0.1,
-      max_tokens: 1500,
+      max_tokens: 3000, // Increased from 1500 to avoid truncation (French responses are longer)
     });
 
     const responseTime = Date.now() - startTime;
@@ -162,6 +162,11 @@ export class AIProvider {
     const tokensOutput = completion.usage?.completion_tokens || 0;
 
     console.log(`[AI Provider] Response received in ${responseTime}ms (${tokensInput + tokensOutput} tokens)`);
+
+    // Check if response was truncated
+    if (completion.choices[0]?.finish_reason === 'length') {
+      console.warn('[AI Provider] ⚠️  Response was truncated due to max_tokens limit!');
+    }
 
     return {
       content,
@@ -345,10 +350,23 @@ RÉPONDEZ UNIQUEMENT AVEC L'OBJET JSON. PAS DE MARKDOWN. PAS D'EXPLICATIONS.`;
     try {
       // Remove markdown code blocks if present
       let cleaned = content.trim();
+
+      // Log raw content for debugging
+      console.log('[AI Provider] Raw AI response length:', content.length);
+      console.log('[AI Provider] First 200 chars:', content.substring(0, 200));
+      console.log('[AI Provider] Last 200 chars:', content.substring(Math.max(0, content.length - 200)));
+
       if (cleaned.startsWith('```json')) {
         cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '');
       } else if (cleaned.startsWith('```')) {
         cleaned = cleaned.replace(/```\n?/g, '');
+      }
+
+      // Check if JSON is complete (basic check)
+      if (!cleaned.endsWith('}')) {
+        console.error('[AI Provider] Response does not end with }, likely truncated');
+        console.error('[AI Provider] Full response:', content);
+        throw new Error('AI response appears truncated (does not end with })');
       }
 
       const parsed = JSON.parse(cleaned);
@@ -362,6 +380,9 @@ RÉPONDEZ UNIQUEMENT AVEC L'OBJET JSON. PAS DE MARKDOWN. PAS D'EXPLICATIONS.`;
         investmentThesis: parsed.investmentThesis || ''
       };
     } catch (error) {
+      console.error('[AI Provider] Failed to parse AI analysis response');
+      console.error('[AI Provider] Error:', error);
+      console.error('[AI Provider] Full content:', content);
       throw new Error(`Failed to parse AI analysis response: ${error instanceof Error ? error.message : 'Invalid JSON'}`);
     }
   }
