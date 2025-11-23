@@ -11,7 +11,7 @@ const cardVariants = cva(
         elevated: 'shadow-card-elevated',
         interactive: 'shadow-card hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer',
         flat: 'shadow-none',
-        gradient: 'bg-gradient-to-br from-white to-gray-50/50 shadow-card',
+        gradient: 'bg-gradient-to-br from-white to-gray-50/50 dark:from-card dark:to-muted/50 shadow-card',
       },
     },
     defaultVariants: {
