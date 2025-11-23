@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { StockSearch } from '@/components/stock-search';
 import { ScoreGauge } from '@/components/score-gauge';
 import { RatioBreakdown } from '@/components/ratio-breakdown';
@@ -13,12 +14,23 @@ import { trpc } from '@/lib/trpc/client';
 import { Loader2, AlertCircle, Search, History, TrendingUp } from 'lucide-react';
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [selectedTickers, setSelectedTickers] = useState<string[] | null>(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedProfile, _setSelectedProfile] = useState<
     'value' | 'growth' | 'dividend'
   >('value');
+
+  // Read ticker from URL parameter and auto-select it
+  useEffect(() => {
+    const tickerFromUrl = searchParams.get('ticker');
+    if (tickerFromUrl && !selectedTicker) {
+      setSelectedTicker(tickerFromUrl);
+      setIsBatchMode(false);
+      setSelectedTickers(null);
+    }
+  }, [searchParams, selectedTicker]);
 
   // Single ticker mode: Fetch stock data when ticker is selected
   const {
