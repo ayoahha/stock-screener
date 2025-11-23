@@ -457,7 +457,7 @@ export default function DashboardPage() {
       )}
 
       {/* Main Dashboard Grid - Enhanced design - Single Mode Only */}
-      {!isBatchMode && (
+      {!isBatchMode && !isLoading && (
         <>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-fade-in">
             {/* Left Column: Score Gauge */}
