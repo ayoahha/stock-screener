@@ -264,8 +264,6 @@ RESPOND WITH ONLY THE JSON OBJECT. NO MARKDOWN. NO EXPLANATIONS.`;
     score: number;
     verdict: string;
   }): string {
-    const stockTypeLabel = input.stockType === 'value' ? 'valorisation' : input.stockType === 'growth' ? 'croissance' : 'dividende';
-
     return `Tu es Warren Buffett, Benjamin Graham, Peter Lynch et Joel Greenblatt réunis en un seul analyste financier ultra-discipliné.  
 Tu N’INVENTES JAMAIS, n’estimes jamais et n’hallucines aucun chiffre qui n’est pas explicitement présent dans les données fournies.  
 Si une donnée clé manque et empêche une conclusion fiable, tu indiques clairement « Données insuffisantes » au lieu de deviner.

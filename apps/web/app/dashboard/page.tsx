@@ -14,21 +14,33 @@ import { Loader2, AlertCircle, Search, History, TrendingUp } from 'lucide-react'
 
 export default function DashboardPage() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
+  const [selectedTickers, setSelectedTickers] = useState<string[] | null>(null);
+  const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedProfile, _setSelectedProfile] = useState<
     'value' | 'growth' | 'dividend'
   >('value');
 
-  // Fetch stock data when ticker is selected
+  // Single ticker mode: Fetch stock data when ticker is selected
   const {
     data: stockData,
     isLoading: isLoadingStock,
     error: stockError,
   } = trpc.stock.fetch.useQuery(
     { ticker: selectedTicker! },
-    { enabled: !!selectedTicker }
+    { enabled: !!selectedTicker && !isBatchMode }
   );
 
-  // Calculate score when stock data is available
+  // Batch mode: Fetch multiple stocks
+  const {
+    data: batchStockData,
+    isLoading: isLoadingBatch,
+    error: batchError,
+  } = trpc.stock.search.useQuery(
+    { tickers: selectedTickers! },
+    { enabled: !!selectedTickers && isBatchMode }
+  );
+
+  // Calculate score when stock data is available (single mode)
   const {
     data: scoringResult,
     isLoading: isLoadingScore,
@@ -38,21 +50,33 @@ export default function DashboardPage() {
       ratios: (stockData?.ratios ?? {}) as Record<string, number | undefined>,
       profileType: selectedProfile,
     },
-    { enabled: !!stockData }
+    { enabled: !!stockData && !isBatchMode }
   );
 
-  // Get stock classification for AI analysis
+  // Get stock classification for AI analysis (single mode)
   const {
     data: classification,
   } = trpc.scoring.classify.useQuery(
     {
       ratios: (stockData?.ratios ?? {}) as Record<string, number | undefined>,
     },
-    { enabled: !!stockData }
+    { enabled: !!stockData && !isBatchMode }
   );
 
-  const isLoading = isLoadingStock || isLoadingScore;
-  const error = stockError || scoreError;
+  const isLoading = isBatchMode ? isLoadingBatch : (isLoadingStock || isLoadingScore);
+  const error = isBatchMode ? batchError : (stockError || scoreError);
+
+  const handleSingleTickerSelected = (ticker: string) => {
+    setIsBatchMode(false);
+    setSelectedTicker(ticker);
+    setSelectedTickers(null);
+  };
+
+  const handleBatchTickersSelected = (tickers: string[]) => {
+    setIsBatchMode(true);
+    setSelectedTickers(tickers);
+    setSelectedTicker(null);
+  };
 
   return (
     <div className="min-h-screen bg-background p-8">
@@ -84,7 +108,10 @@ export default function DashboardPage() {
       <main id="main-content">
         {/* Search Section */}
         <div className="mb-8">
-          <StockSearch onStockSelected={(ticker) => setSelectedTicker(ticker)} />
+          <StockSearch
+            onStockSelected={handleSingleTickerSelected}
+            onBatchSelected={handleBatchTickersSelected}
+          />
         </div>
 
       {/* Enhanced Error Display */}
@@ -109,7 +136,7 @@ export default function DashboardPage() {
       )}
 
       {/* Enhanced Loading State with Skeletons */}
-      {isLoading && selectedTicker && (
+      {isLoading && (selectedTicker || selectedTickers) && (
         <div className="mb-8 animate-fade-in">
           <Card variant="gradient" className="p-6 mb-8">
             <div className="flex items-center gap-4">
@@ -119,7 +146,9 @@ export default function DashboardPage() {
                   Chargement des données...
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Analyse de {selectedTicker} en cours
+                  {isBatchMode
+                    ? `Analyse de ${selectedTickers?.length} actions en cours (avec délais pour éviter les blocages)`
+                    : `Analyse de ${selectedTicker} en cours`}
                 </p>
               </div>
             </div>
@@ -151,8 +180,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Enhanced Stock Info Card */}
-      {stockData && (
+      {/* Enhanced Stock Info Card - Single Mode */}
+      {!isBatchMode && stockData && (
         <div className="mb-8 animate-fade-in">
           <Card variant="gradient" className="p-6 border-l-4 border-brand-gold">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -194,75 +223,114 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Main Dashboard Grid - Enhanced design */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-fade-in">
-        {/* Left Column: Score Gauge */}
-        <div className="xl:col-span-1">
-          <Card variant="elevated" className="p-8 bg-gradient-to-br from-white to-gray-50/30 dark:from-card dark:to-muted/30">
-            <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
-              Score Global
+      {/* Batch Results - Multiple Stocks */}
+      {isBatchMode && batchStockData && batchStockData.length > 0 && (
+        <div className="mb-8 animate-fade-in">
+          <Card variant="elevated" className="p-6">
+            <h2 className="text-2xl font-display font-semibold mb-4">
+              Résultats ({batchStockData.length} action{batchStockData.length > 1 ? 's' : ''})
             </h2>
-            {scoringResult ? (
-              <ScoreGauge
-                score={scoringResult.score}
-                verdict={scoringResult.verdict}
-              />
-            ) : (
-              <div className="text-center py-16">
-                <div className="inline-block p-4 rounded-full bg-muted/30 mb-4">
-                  <Search className="h-12 w-12 text-muted-foreground/40" />
-                </div>
-                <p className="text-muted-foreground font-medium">
-                  Sélectionnez une action pour voir le score
-                </p>
-              </div>
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {batchStockData.map((stock) => (
+                <Card
+                  key={stock.ticker}
+                  variant="gradient"
+                  className="p-4 border-l-4 border-brand-gold cursor-pointer hover:shadow-lg transition-shadow"
+                  onClick={() => handleSingleTickerSelected(stock.ticker)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="text-lg font-bold text-foreground">{stock.ticker}</p>
+                      <p className="text-sm text-muted-foreground truncate">{stock.name}</p>
+                    </div>
+                    <DataSourceBadge source={stock.source} confidence={stock.confidence} />
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-2xl font-display font-bold text-foreground">
+                      {stock.price.toFixed(2)} <span className="text-sm text-muted-foreground">{stock.currency}</span>
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">Cliquez pour voir les détails</p>
+                </Card>
+              ))}
+            </div>
           </Card>
         </div>
+      )}
 
-        {/* Right Column: Ratio Breakdown */}
-        <div className="xl:col-span-2">
-          <Card variant="elevated" className="p-8">
-            <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
-              Ratios Financiers
-            </h2>
-            {stockData ? (
-              <RatioBreakdown
-                ratios={stockData.ratios}
-                breakdown={scoringResult?.breakdown}
-              />
-            ) : (
-              <div className="text-center py-16">
-                <div className="inline-block p-4 rounded-full bg-muted/30 mb-4">
-                  <TrendingUp className="h-12 w-12 text-muted-foreground/40" />
-                </div>
-                <p className="text-muted-foreground font-medium">
-                  Sélectionnez une action pour voir les ratios
-                </p>
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
+      {/* Main Dashboard Grid - Enhanced design - Single Mode Only */}
+      {!isBatchMode && (
+        <>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-fade-in">
+            {/* Left Column: Score Gauge */}
+            <div className="xl:col-span-1">
+              <Card variant="elevated" className="p-8 bg-gradient-to-br from-white to-gray-50/30 dark:from-card dark:to-muted/30">
+                <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
+                  Score Global
+                </h2>
+                {scoringResult ? (
+                  <ScoreGauge
+                    score={scoringResult.score}
+                    verdict={scoringResult.verdict}
+                  />
+                ) : (
+                  <div className="text-center py-16">
+                    <div className="inline-block p-4 rounded-full bg-muted/30 mb-4">
+                      <Search className="h-12 w-12 text-muted-foreground/40" />
+                    </div>
+                    <p className="text-muted-foreground font-medium">
+                      Sélectionnez une action pour voir le score
+                    </p>
+                  </div>
+                )}
+              </Card>
+            </div>
 
-        {/* AI Insights Section - Enhanced */}
-        {stockData && scoringResult && classification && (
-          <div className="mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-            <Card variant="elevated" className="p-8 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-200/50 dark:border-purple-800/50">
-              <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
-                Analyse IA Qualitative
-              </h2>
-              <AIInsightsButton
-                ticker={stockData.ticker}
-                name={stockData.name}
-                ratios={stockData.ratios as Record<string, number | null>}
-                stockType={classification.stockType}
-                score={scoringResult.score}
-                verdict={scoringResult.verdict}
-              />
-            </Card>
+            {/* Right Column: Ratio Breakdown */}
+            <div className="xl:col-span-2">
+              <Card variant="elevated" className="p-8">
+                <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
+                  Ratios Financiers
+                </h2>
+                {stockData ? (
+                  <RatioBreakdown
+                    ratios={stockData.ratios}
+                    breakdown={scoringResult?.breakdown}
+                  />
+                ) : (
+                  <div className="text-center py-16">
+                    <div className="inline-block p-4 rounded-full bg-muted/30 mb-4">
+                      <TrendingUp className="h-12 w-12 text-muted-foreground/40" />
+                    </div>
+                    <p className="text-muted-foreground font-medium">
+                      Sélectionnez une action pour voir les ratios
+                    </p>
+                  </div>
+                )}
+              </Card>
+            </div>
           </div>
-        )}
+
+          {/* AI Insights Section - Enhanced */}
+          {stockData && scoringResult && classification && (
+            <div className="mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+              <Card variant="elevated" className="p-8 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-200/50 dark:border-purple-800/50">
+                <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
+                  Analyse IA Qualitative
+                </h2>
+                <AIInsightsButton
+                  ticker={stockData.ticker}
+                  name={stockData.name}
+                  ratios={stockData.ratios as Record<string, number | null>}
+                  stockType={classification.stockType}
+                  score={scoringResult.score}
+                  verdict={scoringResult.verdict}
+                />
+              </Card>
+            </div>
+          )}
+        </>
+      )}
       </main>
     </div>
   );

@@ -12,7 +12,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { router, publicProcedure } from '../server';
-import { fetchStockData, resolveTicker } from '@stock-screener/scraper';
+import { fetchStockData, resolveTicker, type StockData } from '@stock-screener/scraper';
 import { classifyStock, calculateScore, defaultProfiles } from '@stock-screener/scoring';
 import { createServerClient } from '@stock-screener/database';
 
@@ -102,6 +102,9 @@ export const stockRouter = router({
    * Search multiple tickers at once
    * Input: tickers (ex: ["AAPL", "CAP.PA", "AIR.PA"]), forceRefresh (optional)
    * Output: Array<StockData>
+   *
+   * NOTE: Tickers are processed sequentially with rate limiting to avoid IP bans.
+   * The scraping layer enforces 3-second delays between requests automatically.
    */
   search: publicProcedure
     .input(
@@ -111,7 +114,31 @@ export const stockRouter = router({
       })
     )
     .query(async ({ input }) => {
-      // Batch fetch multiple tickers in parallel
-      return await Promise.all(input.tickers.map((t) => fetchStockData(t, input.forceRefresh)));
+      // Fetch tickers sequentially to respect rate limits and avoid IP bans
+      // The underlying scraping layer will enforce rate limits automatically
+      const results: StockData[] = [];
+      const errors: { ticker: string; error: string }[] = [];
+
+      for (const ticker of input.tickers) {
+        try {
+          const data = await fetchStockData(ticker, input.forceRefresh);
+          results.push(data);
+        } catch (error) {
+          // Log error but continue with other tickers
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`[Stock Router] Failed to fetch ${ticker}: ${errorMessage}`);
+          errors.push({ ticker, error: errorMessage });
+        }
+      }
+
+      // If all failed, throw error with details
+      if (results.length === 0 && errors.length > 0) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Failed to fetch all tickers: ${errors.map(e => `${e.ticker}: ${e.error}`).join('; ')}`,
+        });
+      }
+
+      return results;
     }),
 });
