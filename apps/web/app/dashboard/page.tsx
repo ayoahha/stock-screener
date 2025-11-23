@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { StockSearch } from '@/components/stock-search';
 import { ScoreGauge } from '@/components/score-gauge';
@@ -27,16 +27,21 @@ export default function DashboardPage() {
     'value' | 'growth' | 'dividend'
   >('value');
 
-  // Read ticker from URL parameter and auto-select it
+  // Track if we've already processed the URL ticker to avoid resetting batch mode
+  const hasProcessedUrlTicker = useRef(false);
+
+  // Read ticker from URL parameter and auto-select it (only once)
   useEffect(() => {
     const tickerFromUrl = searchParams.get('ticker');
-    if (tickerFromUrl && !selectedTicker) {
+    // Only process URL ticker once to avoid resetting batch mode
+    if (tickerFromUrl && !hasProcessedUrlTicker.current) {
       setSelectedTicker(tickerFromUrl);
       setIsBatchMode(false);
       setSelectedTickers(null);
       setForceRefresh(false); // Reset refresh flag
+      hasProcessedUrlTicker.current = true;
     }
-  }, [searchParams, selectedTicker]);
+  }, [searchParams]); // Removed selectedTicker from dependencies
 
   // SMART LOADING: Try history first (instant load, no scraping)
   const {
