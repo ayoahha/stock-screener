@@ -2,6 +2,7 @@
 
 import { type FinancialRatios } from '@stock-screener/scraper';
 import { type RatioScore } from '@stock-screener/scoring';
+import { Info } from 'lucide-react';
 
 interface RatioBreakdownProps {
   ratios: FinancialRatios;
@@ -93,9 +94,15 @@ export function RatioBreakdown({ ratios, breakdown }: RatioBreakdownProps) {
 
   return (
     <div className="space-y-8">
-      {ratioGroups.map((group) => (
-        <div key={group.title}>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">{group.title}</h3>
+      {ratioGroups.map((group, groupIndex) => (
+        <div
+          key={group.title}
+          className="animate-fade-in"
+          style={{ animationDelay: `${groupIndex * 0.1}s` }}
+        >
+          <h3 className="text-lg font-display font-semibold text-foreground mb-4 border-l-4 border-brand-gold pl-3">
+            {group.title}
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {group.ratios.map((ratio) => {
               const value = ratios[ratio.key as keyof FinancialRatios];
@@ -106,43 +113,50 @@ export function RatioBreakdown({ ratios, breakdown }: RatioBreakdownProps) {
               return (
                 <div
                   key={ratio.key}
-                  className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="group bg-card border border-border rounded-xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden"
                   title={ratioWithTooltip.tooltip}
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm text-gray-500">{ratio.label}</p>
-                        {ratioWithTooltip.tooltip && (
-                          <span className="text-gray-400 cursor-help" title={ratioWithTooltip.tooltip}>
-                            ℹ️
-                          </span>
-                        )}
+                  {/* Subtle gradient overlay for visual interest */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-transparent to-gray-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-sm font-medium text-muted-foreground">
+                            {ratio.label}
+                          </p>
+                          {ratioWithTooltip.tooltip && (
+                            <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+                          )}
+                        </div>
+                        <p className="text-2xl font-display font-bold text-foreground tabular-nums">
+                          {value !== undefined ? ratio.format(value) : (
+                            <span className="text-muted-foreground/50">N/A</span>
+                          )}
+                        </p>
                       </div>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {value !== undefined ? ratio.format(value) : 'N/A'}
-                      </p>
+                      {score !== undefined && (
+                        <div className="flex flex-col items-end">
+                          <div
+                            className={`${getScoreColor(score)} text-white text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm`}
+                          >
+                            {score}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {score !== undefined && (
-                      <div className="flex flex-col items-end">
-                        <div
-                          className={`${getScoreColor(score)} text-white text-xs font-bold px-2 py-1 rounded`}
-                        >
-                          {score}/100
+                      <div className="mt-3">
+                        <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${getScoreColor(score)} transition-all duration-700 ease-out`}
+                            style={{ width: `${score}%` }}
+                          />
                         </div>
                       </div>
                     )}
                   </div>
-                  {score !== undefined && (
-                    <div className="mt-2">
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${getScoreColor(score)}`}
-                          style={{ width: `${score}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
