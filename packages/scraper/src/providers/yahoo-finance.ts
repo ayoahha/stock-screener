@@ -322,7 +322,6 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
     // Regex fallback - last resort
     console.warn('[Price Extraction] DOM selectors failed, using smart selection fallback...');
     const content = await page.content();
-    const tickerRegexSafe = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Collect all prices from JSON
     const priceRegex = /"regularMarketPrice":\s*\{\s*"raw"\s*:\s*([0-9.]+)/g;
@@ -340,16 +339,16 @@ async function extractPrice(page: Page, ticker: string): Promise<number> {
       const validPrices = allMatches.filter(p => validatePrice(p, ticker));
 
       if (validPrices.length > 0) {
-        let selectedPrice: number;
         const isUSStock = !ticker.includes('.');
+        let selectedPrice: number;
 
         if (isUSStock) {
           const reasonablePrices = validPrices.filter(p => p >= 1 && p <= 1000);
           selectedPrice = reasonablePrices.length > 0
-            ? reasonablePrices[reasonablePrices.length - 1]
-            : validPrices[0];
+            ? reasonablePrices[reasonablePrices.length - 1]!
+            : validPrices[0]!;
         } else {
-          selectedPrice = validPrices[0];
+          selectedPrice = validPrices[0]!;
         }
 
         console.log(`[Price Extraction] ✓ SMART SELECT: ${selectedPrice} (${validPrices.length} candidates)`);
