@@ -21,8 +21,6 @@ export default function DashboardPage() {
   const [selectedTickers, setSelectedTickers] = useState<string[] | null>(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [forceRefresh, setForceRefresh] = useState(false);
-  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0 });
   const [selectedProfile, _setSelectedProfile] = useState<
     'value' | 'growth' | 'dividend'
   >('value');
@@ -126,77 +124,11 @@ export default function DashboardPage() {
     : (isLoadingHistory || isLoadingFresh || isLoadingScore);
   const error = isBatchMode ? batchError : (stockError || scoreError);
 
-  // Mutation to refresh individual stock
-  const refreshMutation = trpc.history.refresh.useMutation();
-
-  // Get tRPC utils for manual queries
-  const utils = trpc.useContext();
-
   // Handle refresh button click
   const handleRefresh = () => {
     setForceRefresh(true);
     // Reset after triggering to allow future refreshes
     setTimeout(() => setForceRefresh(false), 100);
-  };
-
-  // Handle refresh all button click
-  const handleRefreshAll = async () => {
-    if (!confirm('⚠️ Voulez-vous actualiser TOUTES les actions de l\'historique?\n\nCela peut prendre plusieurs minutes (3 secondes par action pour éviter les blocages).')) {
-      return;
-    }
-
-    try {
-      setIsRefreshingAll(true);
-
-      // Fetch all stocks from history using tRPC
-      const historyList = await utils.history.list.fetch({ limit: 1000 });
-      const stocks = historyList.items || [];
-
-      if (stocks.length === 0) {
-        alert('Aucune action dans l\'historique à actualiser');
-        setIsRefreshingAll(false);
-        return;
-      }
-
-      setRefreshProgress({ current: 0, total: stocks.length });
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      // Refresh each stock sequentially with rate limiting
-      for (let i = 0; i < stocks.length; i++) {
-        const stock = stocks[i];
-        try {
-          await refreshMutation.mutateAsync({
-            ticker: stock.ticker,
-            stockType: stock.stock_type,
-          });
-          successCount++;
-          setRefreshProgress({ current: i + 1, total: stocks.length });
-
-          // Rate limiting: Wait 3 seconds between requests to avoid IP bans
-          if (i < stocks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
-        } catch (error) {
-          console.error(`Failed to refresh ${stock.ticker}:`, error);
-          errorCount++;
-          // Continue with next stock even if one fails
-        }
-      }
-
-      const message = errorCount > 0
-        ? `✅ Actualisation terminée:\n${successCount} succès, ${errorCount} erreur(s)`
-        : `✅ Actualisation terminée: ${successCount} action(s) mises à jour`;
-
-      alert(message);
-    } catch (error) {
-      console.error('Error refreshing all stocks:', error);
-      alert('❌ Erreur lors de l\'actualisation globale');
-    } finally {
-      setIsRefreshingAll(false);
-      setRefreshProgress({ current: 0, total: 0 });
-    }
   };
 
   const handleSingleTickerSelected = (ticker: string) => {
@@ -239,57 +171,12 @@ export default function DashboardPage() {
       </nav>
 
       <main id="main-content">
-        {/* Search Section with Refresh All Button */}
+        {/* Search Section */}
         <div className="mb-8">
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
-              <StockSearch
-                onStockSelected={handleSingleTickerSelected}
-                onBatchSelected={handleBatchTickersSelected}
-              />
-            </div>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={handleRefreshAll}
-              disabled={isRefreshingAll}
-              className="hover:bg-green-50 hover:border-green-400 transition-colors mb-2"
-              title="Actualiser toutes les actions de l'historique"
-            >
-              <RefreshCw className={`h-5 w-5 ${isRefreshingAll ? 'animate-spin' : ''}`} />
-              <span className="ml-2 font-semibold">
-                {isRefreshingAll
-                  ? `Actualisation ${refreshProgress.current}/${refreshProgress.total}...`
-                  : 'Actualiser Tout'}
-              </span>
-            </Button>
-          </div>
-          {isRefreshingAll && (
-            <Card variant="elevated" className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/50">
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-                    Actualisation en cours...
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    {refreshProgress.current} / {refreshProgress.total} actions mises à jour (délai de 3s entre chaque)
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {Math.round((refreshProgress.current / refreshProgress.total) * 100)}%
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
-                <div
-                  className="bg-blue-600 h-full transition-all duration-300"
-                  style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }}
-                />
-              </div>
-            </Card>
-          )}
+          <StockSearch
+            onStockSelected={handleSingleTickerSelected}
+            onBatchSelected={handleBatchTickersSelected}
+          />
         </div>
 
       {/* Enhanced Error Display */}
