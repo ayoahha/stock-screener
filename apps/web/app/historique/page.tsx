@@ -24,6 +24,7 @@ import {
   TrendingDown,
   DollarSign,
   BarChart3,
+  Trash2,
 } from 'lucide-react';
 import { formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -42,6 +43,7 @@ export default function HistoriquePage() {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [confirmRefresh, setConfirmRefresh] = useState<{ ticker: string; stockType: StockType } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ ticker: string; name: string } | null>(null);
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0 });
 
@@ -83,6 +85,25 @@ export default function HistoriquePage() {
     },
   });
 
+  // Delete mutation
+  const deleteMutation = trpc.history.delete.useMutation({
+    onSuccess: (_, variables) => {
+      refetch();
+      addToast({
+        type: 'success',
+        title: 'Action supprimée',
+        description: `${variables.ticker} a été supprimé de l'historique`,
+      });
+    },
+    onError: (error, variables) => {
+      addToast({
+        type: 'error',
+        title: 'Erreur de suppression',
+        description: `Impossible de supprimer ${variables.ticker}: ${error.message}`,
+      });
+    },
+  });
+
   // Get tRPC utils for manual queries
   const utils = trpc.useContext();
 
@@ -93,6 +114,17 @@ export default function HistoriquePage() {
   const handleConfirmRefresh = async () => {
     if (confirmRefresh) {
       await refreshMutation.mutateAsync(confirmRefresh);
+    }
+  };
+
+  const handleDeleteClick = (ticker: string, name: string) => {
+    setConfirmDelete({ ticker, name });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (confirmDelete) {
+      await deleteMutation.mutateAsync({ ticker: confirmDelete.ticker });
+      setConfirmDelete(null);
     }
   };
 
@@ -513,23 +545,41 @@ export default function HistoriquePage() {
                           locale: fr,
                         })}
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRefreshClick(stock.ticker, stock.stock_type);
-                        }}
-                        disabled={refreshMutation.isPending}
-                        aria-label={`Actualiser les données de ${stock.ticker}`}
-                      >
-                        <RefreshCw
-                          className={`h-3.5 w-3.5 ${
-                            refreshMutation.isPending ? 'animate-spin' : ''
-                          }`}
-                          aria-hidden="true"
-                        />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRefreshClick(stock.ticker, stock.stock_type);
+                          }}
+                          disabled={refreshMutation.isPending}
+                          aria-label={`Actualiser les données de ${stock.ticker}`}
+                        >
+                          <RefreshCw
+                            className={`h-3.5 w-3.5 ${
+                              refreshMutation.isPending ? 'animate-spin' : ''
+                            }`}
+                            aria-hidden="true"
+                          />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(stock.ticker, stock.name);
+                          }}
+                          disabled={deleteMutation.isPending}
+                          className="hover:bg-red-50 hover:border-red-400 transition-colors disabled:opacity-50"
+                          aria-label={`Supprimer ${stock.ticker} de l'historique`}
+                        >
+                          <Trash2
+                            className="h-3.5 w-3.5 text-red-600"
+                            aria-hidden="true"
+                          />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </Card>
@@ -707,6 +757,19 @@ export default function HistoriquePage() {
                               aria-hidden="true"
                             />
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteClick(stock.ticker, stock.name)}
+                            disabled={deleteMutation.isPending}
+                            className="hover:bg-red-50 hover:border-red-400 transition-colors disabled:opacity-50"
+                            aria-label={`Supprimer ${stock.ticker} de l'historique`}
+                          >
+                            <Trash2
+                              className="h-3.5 w-3.5 text-red-600"
+                              aria-hidden="true"
+                            />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -729,6 +792,17 @@ export default function HistoriquePage() {
         confirmLabel="Actualiser"
         cancelLabel="Annuler"
         onConfirm={handleConfirmRefresh}
+      />
+
+      {/* Confirmation Dialog for Delete */}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        title="Supprimer de l'historique"
+        description={`Voulez-vous supprimer ${confirmDelete?.ticker} (${confirmDelete?.name}) de l'historique ? Cette action est irréversible.`}
+        confirmLabel="Supprimer"
+        cancelLabel="Annuler"
+        onConfirm={handleConfirmDelete}
       />
     </div>
   );
