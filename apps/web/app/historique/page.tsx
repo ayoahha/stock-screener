@@ -42,6 +42,8 @@ export default function HistoriquePage() {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [confirmRefresh, setConfirmRefresh] = useState<{ ticker: string; stockType: StockType } | null>(null);
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0 });
 
   // Fetch history list
   const {
@@ -81,6 +83,9 @@ export default function HistoriquePage() {
     },
   });
 
+  // Get tRPC utils for manual queries
+  const utils = trpc.useContext();
+
   const handleRefreshClick = (ticker: string, stockType: StockType) => {
     setConfirmRefresh({ ticker, stockType });
   };
@@ -102,6 +107,79 @@ export default function HistoriquePage() {
     } else {
       setSortField(field);
       setSortOrder('asc');
+    }
+  };
+
+  // Handle refresh all button click
+  const handleRefreshAll = async () => {
+    if (!confirm('⚠️ Voulez-vous actualiser TOUTES les actions de l\'historique?\n\nCela peut prendre plusieurs minutes (3 secondes par action pour éviter les blocages).')) {
+      return;
+    }
+
+    try {
+      setIsRefreshingAll(true);
+
+      // Fetch all stocks from history using tRPC
+      const historyList = await utils.history.list.fetch({ limit: 1000 });
+      const stocks = historyList.items || [];
+
+      if (stocks.length === 0) {
+        addToast({
+          type: 'info',
+          title: 'Historique vide',
+          description: 'Aucune action dans l\'historique à actualiser',
+        });
+        setIsRefreshingAll(false);
+        return;
+      }
+
+      setRefreshProgress({ current: 0, total: stocks.length });
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Refresh each stock sequentially with rate limiting
+      for (let i = 0; i < stocks.length; i++) {
+        const stock = stocks[i];
+        try {
+          await refreshMutation.mutateAsync({
+            ticker: stock.ticker,
+            stockType: stock.stock_type,
+          });
+          successCount++;
+          setRefreshProgress({ current: i + 1, total: stocks.length });
+
+          // Rate limiting: Wait 3 seconds between requests to avoid IP bans
+          if (i < stocks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+        } catch (error) {
+          console.error(`Failed to refresh ${stock.ticker}:`, error);
+          errorCount++;
+          // Continue with next stock even if one fails
+        }
+      }
+
+      // Refetch the history list to show updated data
+      refetch();
+
+      addToast({
+        type: errorCount > 0 ? 'warning' : 'success',
+        title: 'Actualisation terminée',
+        description: errorCount > 0
+          ? `${successCount} succès, ${errorCount} erreur(s)`
+          : `${successCount} action(s) mises à jour`,
+      });
+    } catch (error) {
+      console.error('Error refreshing all stocks:', error);
+      addToast({
+        type: 'error',
+        title: 'Erreur',
+        description: 'Erreur lors de l\'actualisation globale',
+      });
+    } finally {
+      setIsRefreshingAll(false);
+      setRefreshProgress({ current: 0, total: 0 });
     }
   };
 
@@ -135,17 +213,64 @@ export default function HistoriquePage() {
         </p>
       </header>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation with Refresh All Button */}
       <nav aria-label="Navigation principale">
-        <TabNavigation
-          tabs={[
-            { label: 'Recherche', href: '/dashboard', icon: <Search className="h-5 w-5" /> },
-            { label: 'Historique', href: '/historique', icon: <History className="h-5 w-5" /> },
-          ]}
-        />
+        <div className="flex items-center justify-between gap-4">
+          <TabNavigation
+            tabs={[
+              { label: 'Recherche', href: '/dashboard', icon: <Search className="h-5 w-5" /> },
+              { label: 'Historique', href: '/historique', icon: <History className="h-5 w-5" /> },
+            ]}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshAll}
+            disabled={isRefreshingAll}
+            className="hover:bg-green-50 hover:border-green-400 transition-colors"
+            title="Actualiser toutes les actions de l'historique"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshingAll ? 'animate-spin' : ''}`} />
+            <span className="ml-2 font-semibold">
+              {isRefreshingAll
+                ? `${refreshProgress.current}/${refreshProgress.total}`
+                : 'Actualiser Tout'}
+            </span>
+          </Button>
+        </div>
       </nav>
 
       <main id="main-content">
+        {/* Progress Indicator */}
+        {isRefreshingAll && (
+          <div className="mb-8 mt-4 animate-fade-in">
+            <Card variant="elevated" className="p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/50">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+                    Actualisation en cours...
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    {refreshProgress.current} / {refreshProgress.total} actions mises à jour (délai de 3s entre chaque)
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {Math.round((refreshProgress.current / refreshProgress.total) * 100)}%
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-full transition-all duration-300"
+                  style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }}
+                />
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Enhanced Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

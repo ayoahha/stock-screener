@@ -1,34 +1,77 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { StockSearch } from '@/components/stock-search';
 import { ScoreGauge } from '@/components/score-gauge';
 import { RatioBreakdown } from '@/components/ratio-breakdown';
 import { TabNavigation } from '@/components/tab-navigation';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { SkeletonCard, SkeletonGauge } from '@/components/ui/skeleton';
 import { DataSourceBadge } from '@/components/data-source-badge';
 import { AIInsightsButton } from '@/components/ai-insights-button';
 import { trpc } from '@/lib/trpc/client';
-import { Loader2, AlertCircle, Search, History, TrendingUp } from 'lucide-react';
+import { Loader2, AlertCircle, Search, History, TrendingUp, RefreshCw } from 'lucide-react';
+import { type FinancialRatios } from '@stock-screener/scraper';
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [selectedTickers, setSelectedTickers] = useState<string[] | null>(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
+  const [forceRefresh, setForceRefresh] = useState(false);
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0 });
   const [selectedProfile, _setSelectedProfile] = useState<
     'value' | 'growth' | 'dividend'
   >('value');
 
-  // Single ticker mode: Fetch stock data when ticker is selected
+  // Track if we've already processed the URL ticker to avoid resetting batch mode
+  const hasProcessedUrlTicker = useRef(false);
+
+  // Read ticker from URL parameter and auto-select it (only once)
+  useEffect(() => {
+    const tickerFromUrl = searchParams.get('ticker');
+    // Only process URL ticker once to avoid resetting batch mode
+    if (tickerFromUrl && !hasProcessedUrlTicker.current) {
+      setSelectedTicker(tickerFromUrl);
+      setIsBatchMode(false);
+      setSelectedTickers(null);
+      setForceRefresh(false); // Reset refresh flag
+      hasProcessedUrlTicker.current = true;
+    }
+  }, [searchParams]); // Removed selectedTicker from dependencies
+
+  // SMART LOADING: Try history first (instant load, no scraping)
   const {
-    data: stockData,
-    isLoading: isLoadingStock,
+    data: historyData,
+    isLoading: isLoadingHistory,
+    isFetched: historyFetched,
+  } = trpc.history.get.useQuery(
+    { ticker: selectedTicker! },
+    {
+      enabled: !!selectedTicker && !isBatchMode && !forceRefresh,
+      staleTime: Infinity, // Don't auto-refetch
+    }
+  );
+
+  // Only fetch fresh data if:
+  // 1. Forcing refresh, OR
+  // 2. History query completed but no data found (new ticker)
+  const needsFreshData = forceRefresh || (historyFetched && !historyData);
+
+  const {
+    data: freshStockData,
+    isLoading: isLoadingFresh,
     error: stockError,
   } = trpc.stock.fetch.useQuery(
-    { ticker: selectedTicker! },
-    { enabled: !!selectedTicker && !isBatchMode }
+    { ticker: selectedTicker!, forceRefresh: true },
+    { enabled: !!selectedTicker && !isBatchMode && needsFreshData }
   );
+
+  // Use history data if available (unless forcing refresh), otherwise use fresh data
+  const stockData = forceRefresh ? freshStockData : (historyData || freshStockData);
 
   // Batch mode: Fetch multiple stocks
   const {
@@ -41,17 +84,29 @@ export default function DashboardPage() {
   );
 
   // Calculate score when stock data is available (single mode)
+  // If using history data, we already have score/verdict
+  const shouldCalculateScore = !!stockData && !historyData && !isBatchMode;
+
   const {
-    data: scoringResult,
+    data: calculatedScoring,
     isLoading: isLoadingScore,
     error: scoreError,
   } = trpc.scoring.calculate.useQuery(
     {
       ratios: (stockData?.ratios ?? {}) as Record<string, number | undefined>,
-      profileType: selectedProfile,
+      profileType: historyData?.stock_type || selectedProfile,
     },
-    { enabled: !!stockData && !isBatchMode }
+    { enabled: shouldCalculateScore }
   );
+
+  // Use score from history if available, otherwise use calculated score
+  const scoringResult = historyData
+    ? {
+        score: historyData.score ?? 0,
+        verdict: (historyData.verdict ?? 'FAIR') as 'TOO_EXPENSIVE' | 'EXPENSIVE' | 'FAIR' | 'GOOD_DEAL' | 'EXCELLENT_DEAL' | 'EXCEPTIONAL',
+        breakdown: undefined
+      }
+    : calculatedScoring;
 
   // Get stock classification for AI analysis (single mode)
   const {
@@ -60,11 +115,89 @@ export default function DashboardPage() {
     {
       ratios: (stockData?.ratios ?? {}) as Record<string, number | undefined>,
     },
-    { enabled: !!stockData && !isBatchMode }
+    { enabled: !!stockData && !historyData && !isBatchMode }
   );
 
-  const isLoading = isBatchMode ? isLoadingBatch : (isLoadingStock || isLoadingScore);
+  // Use stock_type from history if available, otherwise use classification
+  const stockType = historyData?.stock_type || classification?.stockType;
+
+  const isLoading = isBatchMode
+    ? isLoadingBatch
+    : (isLoadingHistory || isLoadingFresh || isLoadingScore);
   const error = isBatchMode ? batchError : (stockError || scoreError);
+
+  // Mutation to refresh individual stock
+  const refreshMutation = trpc.history.refresh.useMutation();
+
+  // Get tRPC utils for manual queries
+  const utils = trpc.useContext();
+
+  // Handle refresh button click
+  const handleRefresh = () => {
+    setForceRefresh(true);
+    // Reset after triggering to allow future refreshes
+    setTimeout(() => setForceRefresh(false), 100);
+  };
+
+  // Handle refresh all button click
+  const handleRefreshAll = async () => {
+    if (!confirm('⚠️ Voulez-vous actualiser TOUTES les actions de l\'historique?\n\nCela peut prendre plusieurs minutes (3 secondes par action pour éviter les blocages).')) {
+      return;
+    }
+
+    try {
+      setIsRefreshingAll(true);
+
+      // Fetch all stocks from history using tRPC
+      const historyList = await utils.history.list.fetch({ limit: 1000 });
+      const stocks = historyList.items || [];
+
+      if (stocks.length === 0) {
+        alert('Aucune action dans l\'historique à actualiser');
+        setIsRefreshingAll(false);
+        return;
+      }
+
+      setRefreshProgress({ current: 0, total: stocks.length });
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Refresh each stock sequentially with rate limiting
+      for (let i = 0; i < stocks.length; i++) {
+        const stock = stocks[i];
+        try {
+          await refreshMutation.mutateAsync({
+            ticker: stock.ticker,
+            stockType: stock.stock_type,
+          });
+          successCount++;
+          setRefreshProgress({ current: i + 1, total: stocks.length });
+
+          // Rate limiting: Wait 3 seconds between requests to avoid IP bans
+          if (i < stocks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+        } catch (error) {
+          console.error(`Failed to refresh ${stock.ticker}:`, error);
+          errorCount++;
+          // Continue with next stock even if one fails
+        }
+      }
+
+      const message = errorCount > 0
+        ? `✅ Actualisation terminée:\n${successCount} succès, ${errorCount} erreur(s)`
+        : `✅ Actualisation terminée: ${successCount} action(s) mises à jour`;
+
+      alert(message);
+    } catch (error) {
+      console.error('Error refreshing all stocks:', error);
+      alert('❌ Erreur lors de l\'actualisation globale');
+    } finally {
+      setIsRefreshingAll(false);
+      setRefreshProgress({ current: 0, total: 0 });
+    }
+  };
 
   const handleSingleTickerSelected = (ticker: string) => {
     setIsBatchMode(false);
@@ -95,17 +228,64 @@ export default function DashboardPage() {
         </p>
       </header>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation with Refresh All Button */}
       <nav aria-label="Navigation principale">
-        <TabNavigation
-          tabs={[
-            { label: 'Recherche', href: '/dashboard', icon: <Search className="h-5 w-5" /> },
-            { label: 'Historique', href: '/historique', icon: <History className="h-5 w-5" /> },
-          ]}
-        />
+        <div className="flex items-center justify-between gap-4">
+          <TabNavigation
+            tabs={[
+              { label: 'Recherche', href: '/dashboard', icon: <Search className="h-5 w-5" /> },
+              { label: 'Historique', href: '/historique', icon: <History className="h-5 w-5" /> },
+            ]}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshAll}
+            disabled={isRefreshingAll}
+            className="hover:bg-green-50 hover:border-green-400 transition-colors"
+            title="Actualiser toutes les actions de l'historique"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshingAll ? 'animate-spin' : ''}`} />
+            <span className="ml-2 font-semibold">
+              {isRefreshingAll
+                ? `${refreshProgress.current}/${refreshProgress.total}`
+                : 'Actualiser Tout'}
+            </span>
+          </Button>
+        </div>
       </nav>
 
       <main id="main-content">
+        {/* Progress Indicator */}
+        {isRefreshingAll && (
+          <div className="mb-8 mt-4 animate-fade-in">
+            <Card variant="elevated" className="p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/50">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
+                    Actualisation en cours...
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    {refreshProgress.current} / {refreshProgress.total} actions mises à jour (délai de 3s entre chaque)
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {Math.round((refreshProgress.current / refreshProgress.total) * 100)}%
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-blue-600 h-full transition-all duration-300"
+                  style={{ width: `${(refreshProgress.current / refreshProgress.total) * 100}%` }}
+                />
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* Search Section */}
         <div className="mb-8">
           <StockSearch
@@ -154,7 +334,7 @@ export default function DashboardPage() {
             </div>
           </Card>
 
-          {/* Loading Skeletons */}
+          {/* Loading Skeletons - Simplified */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <div className="xl:col-span-1">
               <Card variant="elevated" className="p-8">
@@ -166,7 +346,7 @@ export default function DashboardPage() {
               <Card variant="elevated" className="p-8">
                 <h2 className="text-2xl font-display font-semibold mb-6">Ratios Financiers</h2>
                 <div className="space-y-6">
-                  {[...Array(3)].map((_, i) => (
+                  {[...Array(2)].map((_, i) => (
                     <div key={i} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {[...Array(3)].map((_, j) => (
                         <SkeletonCard key={j} />
@@ -184,41 +364,59 @@ export default function DashboardPage() {
       {!isBatchMode && stockData && (
         <div className="mb-8 animate-fade-in">
           <Card variant="gradient" className="p-6 border-l-4 border-brand-gold">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                  Ticker
-                </p>
-                <p className="text-2xl font-display font-bold text-foreground">
-                  {stockData.ticker}
-                </p>
+            <div className="flex items-start justify-between mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    Ticker
+                  </p>
+                  <p className="text-2xl font-display font-bold text-foreground">
+                    {stockData.ticker}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    Nom
+                  </p>
+                  <p className="text-xl font-semibold text-foreground">
+                    {stockData.name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    Prix
+                  </p>
+                  <p className="text-2xl font-display font-bold text-foreground tabular-nums">
+                    {stockData.price?.toFixed(2) || 'N/A'} {stockData.price && <span className="text-base text-muted-foreground">{stockData.currency}</span>}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                    Source
+                  </p>
+                  <DataSourceBadge
+                    source={stockData.source}
+                    confidence={'confidence' in stockData ? stockData.confidence : undefined}
+                  />
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                  Nom
-                </p>
-                <p className="text-xl font-semibold text-foreground">
-                  {stockData.name}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                  Prix
-                </p>
-                <p className="text-2xl font-display font-bold text-foreground tabular-nums">
-                  {stockData.price.toFixed(2)} <span className="text-base text-muted-foreground">{stockData.currency}</span>
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                  Source
-                </p>
-                <DataSourceBadge
-                  source={stockData.source}
-                  confidence={stockData.confidence}
-                />
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isLoadingFresh}
+                className="ml-4 hover:bg-blue-50 hover:border-blue-400 transition-colors"
+                title="Actualiser les données depuis la source"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoadingFresh ? 'animate-spin' : ''}`} />
+                <span className="ml-2">Actualiser</span>
+              </Button>
             </div>
+            {historyData && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Dernière mise à jour : {new Date(historyData.last_fetched_at).toLocaleString('fr-FR')}
+              </p>
+            )}
           </Card>
         </div>
       )}
@@ -259,7 +457,7 @@ export default function DashboardPage() {
       )}
 
       {/* Main Dashboard Grid - Enhanced design - Single Mode Only */}
-      {!isBatchMode && (
+      {!isBatchMode && !isLoading && (
         <>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-fade-in">
             {/* Left Column: Score Gauge */}
@@ -294,7 +492,7 @@ export default function DashboardPage() {
                 </h2>
                 {stockData ? (
                   <RatioBreakdown
-                    ratios={stockData.ratios}
+                    ratios={stockData.ratios as FinancialRatios}
                     breakdown={scoringResult?.breakdown}
                   />
                 ) : (
@@ -312,7 +510,7 @@ export default function DashboardPage() {
           </div>
 
           {/* AI Insights Section - Enhanced */}
-          {stockData && scoringResult && classification && (
+          {stockData && scoringResult && stockType && (
             <div className="mt-8 animate-fade-in" style={{ animationDelay: '0.2s' }}>
               <Card variant="elevated" className="p-8 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-200/50 dark:border-purple-800/50">
                 <h2 className="text-2xl font-display font-semibold mb-6 border-b border-border pb-3">
@@ -322,9 +520,9 @@ export default function DashboardPage() {
                   ticker={stockData.ticker}
                   name={stockData.name}
                   ratios={stockData.ratios as Record<string, number | null>}
-                  stockType={classification.stockType}
+                  stockType={stockType}
                   score={scoringResult.score}
-                  verdict={scoringResult.verdict}
+                  verdict={scoringResult.verdict || ''}
                 />
               </Card>
             </div>
