@@ -456,21 +456,29 @@ async function extractRatios(page: Page): Promise<FinancialRatios> {
           extractedCount++;
           console.log(`[Ratios] ✓ PS: ${value} (${label})`);
         } else if (labelLower.includes('return on equity') || labelLower === 'roe') {
-          ratios.ROE = value;
+          // ROE should be in decimal format (0.15 = 15%). ROE >100% is extremely rare,
+          // so if value > 1.0, assume it's a percentage and divide by 100.
+          ratios.ROE = value !== undefined && value > 1.0 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ ROE: ${value} (${label})`);
+          console.log(`[Ratios] ✓ ROE: ${ratios.ROE} (${label})`);
         } else if (labelLower.includes('return on assets') || labelLower === 'roa') {
-          ratios.ROA = value;
+          // ROA should be in decimal format (0.08 = 8%). ROA >50% is extremely rare,
+          // so if value > 0.5, assume it's a percentage and divide by 100.
+          ratios.ROA = value !== undefined && value > 0.5 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ ROA: ${value} (${label})`);
+          console.log(`[Ratios] ✓ ROA: ${ratios.ROA} (${label})`);
         } else if (labelLower.includes('profit margin') || labelLower.includes('net margin')) {
-          ratios.NetMargin = value;
+          // NetMargin should be in decimal format (0.12 = 12%). Margins >100% are impossible,
+          // so if value > 1.0, assume it's a percentage and divide by 100.
+          ratios.NetMargin = value !== undefined && value > 1.0 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ NetMargin: ${value} (${label})`);
+          console.log(`[Ratios] ✓ NetMargin: ${ratios.NetMargin} (${label})`);
         } else if (labelLower.includes('operating margin')) {
-          ratios.OperatingMargin = value;
+          // OperatingMargin should be in decimal format (0.18 = 18%). Margins >100% are impossible,
+          // so if value > 1.0, assume it's a percentage and divide by 100.
+          ratios.OperatingMargin = value !== undefined && value > 1.0 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ OperatingMargin: ${value} (${label})`);
+          console.log(`[Ratios] ✓ OperatingMargin: ${ratios.OperatingMargin} (${label})`);
         } else if (labelLower.includes('total debt/equity') || labelLower.includes('debt to equity')) {
           ratios.DebtToEquity = value;
           extractedCount++;
@@ -487,21 +495,31 @@ async function extractRatios(page: Page): Promise<FinancialRatios> {
           labelLower.includes('forward annual dividend yield') ||
           labelLower.includes('dividend yield')
         ) {
-          ratios.DividendYield = value;
+          // Yahoo Finance sometimes returns dividend yield as a percentage value (1.80, 0.85)
+          // instead of decimal (0.018, 0.0085). Dividend yields >25% are extremely rare,
+          // so if value > 0.25, assume it's a percentage and divide by 100.
+          ratios.DividendYield = value !== undefined && value > 0.25 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ DividendYield: ${value} (${label})`);
+          console.log(`[Ratios] ✓ DividendYield: ${ratios.DividendYield} (${label})`);
         } else if (labelLower.includes('payout ratio')) {
-          ratios.PayoutRatio = value;
+          // Yahoo Finance sometimes returns payout ratio as a percentage value (45.0)
+          // instead of decimal (0.45). Payout ratios >150% are rare (except special dividends),
+          // so if value > 1.5, assume it's a percentage and divide by 100.
+          ratios.PayoutRatio = value !== undefined && value > 1.5 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ PayoutRatio: ${value} (${label})`);
+          console.log(`[Ratios] ✓ PayoutRatio: ${ratios.PayoutRatio} (${label})`);
         } else if (labelLower.includes('revenue growth') || labelLower.includes('quarterly revenue growth')) {
-          ratios.RevenueGrowth = value;
+          // RevenueGrowth should be in decimal format (0.15 = 15%). Growth rates can be > 100%,
+          // so only divide if absolute value > 5 (meaning > 500%, which is rare).
+          ratios.RevenueGrowth = value !== undefined && Math.abs(value) > 5 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ RevenueGrowth: ${value} (${label})`);
+          console.log(`[Ratios] ✓ RevenueGrowth: ${ratios.RevenueGrowth} (${label})`);
         } else if (labelLower.includes('earnings growth') || labelLower.includes('quarterly earnings growth')) {
-          ratios.EPSGrowth = value;
+          // EPSGrowth should be in decimal format (0.25 = 25%). Growth rates can be > 100%,
+          // so only divide if absolute value > 5 (meaning > 500%, which is rare).
+          ratios.EPSGrowth = value !== undefined && Math.abs(value) > 5 ? value / 100 : value;
           extractedCount++;
-          console.log(`[Ratios] ✓ EPSGrowth: ${value} (${label})`);
+          console.log(`[Ratios] ✓ EPSGrowth: ${ratios.EPSGrowth} (${label})`);
         } else if (labelLower.includes('market cap')) {
           ratios.MarketCap = parseMarketCap(valueText);
           extractedCount++;
