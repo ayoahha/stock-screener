@@ -333,6 +333,9 @@ RÉPOND UNIQUEMENT AVEC L'OBJET JSON. PAS DE MARKDOWN. PAS D'EXPLICATIONS.`;
         cleaned = cleaned.replace(/```\n?/g, '');
       }
 
+      // Trim again after removing markdown fences to handle trailing newlines
+      cleaned = cleaned.trim();
+
       const parsed = JSON.parse(cleaned);
 
       return {
@@ -370,6 +373,9 @@ RÉPOND UNIQUEMENT AVEC L'OBJET JSON. PAS DE MARKDOWN. PAS D'EXPLICATIONS.`;
       } else if (cleaned.startsWith('```')) {
         cleaned = cleaned.replace(/```\n?/g, '');
       }
+
+      // Trim again after removing markdown fences to handle trailing newlines
+      cleaned = cleaned.trim();
 
       // Check if JSON is complete (basic check)
       if (!cleaned.endsWith('}')) {
