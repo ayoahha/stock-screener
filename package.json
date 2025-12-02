@@ -25,7 +25,13 @@
     "clean": "turbo run clean && rm -rf node_modules .turbo",
     "setup": "bash scripts/setup.sh",
     "db:generate-types": "pnpm --filter @stock-screener/database generate-types",
-    "db:test": "tsx scripts/test-supabase.ts",
+    "db:test": "tsx scripts/db-test.ts",
+    "db:setup": "bash scripts/db-setup.sh",
+    "db:start": "docker compose up -d postgres",
+    "db:stop": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:reset": "docker compose down -v && docker compose up -d postgres",
+    "db:admin": "docker compose --profile admin up -d",
     "quality:check": "bash scripts/check-quality.sh"
   },
   "devDependencies": {
