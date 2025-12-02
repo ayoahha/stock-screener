@@ -4,9 +4,10 @@ This guide explains how to run Stock Screener with a local PostgreSQL database u
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) (version 20.10+)
-- [Docker Compose](https://docs.docker.com/compose/install/) (version 2.0+)
-- Node.js 20+ and pnpm 8+
+- [Docker](https://docs.docker.com/get-docker/) (version 24.0+)
+- [Docker Compose](https://docs.docker.com/compose/install/) (version 2.20+)
+- Node.js 22+ and pnpm 9+
+- Ubuntu 25.04 or compatible Linux distribution
 
 ## Quick Start
 
@@ -232,3 +233,20 @@ pnpm db:test
 ```
 
 The application uses a unified database client that automatically detects and uses the PostgreSQL backend when `DATABASE_URL` is set. The same codebase works with both Supabase (cloud) and PostgreSQL (local).
+
+## Version Information (December 2025)
+
+| Component | Version |
+|-----------|---------|
+| PostgreSQL | 18.1 |
+| Node.js | 22+ (24 recommended) |
+| pnpm | 9+ (10.24 recommended) |
+| Next.js | 16.x |
+| React | 19.2.x |
+| TypeScript | 5.9.x |
+| Tailwind CSS | 4.1.x |
+| tRPC | 11.7.x |
+| Vitest | 4.x |
+| Playwright | 1.57.x |
+
+These versions are tested and recommended for optimal compatibility.
